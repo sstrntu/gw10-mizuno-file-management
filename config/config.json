@@ -1,0 +1,12 @@
+{
+    "version": "1.0",
+    "drive": {
+        "rootFolder": "26SS_FTW_Sell-in"
+    },
+    "includes": {
+        "packs": "./packs.json",
+        "models": "./models.json",
+        "folders": "./folders.json",
+        "rules": "./rules.json"
+    }
+}

@@ -1,0 +1,44 @@
+{
+    "models": [
+        {
+            "code": "N5BJ",
+            "folder": "1. MORELIA NEO V β Japan"
+        },
+        {
+            "code": "N5RJ",
+            "folder": "2. MORELIA NEO V JAPAN"
+        },
+        {
+            "code": "A3J",
+            "folder": "3. MIZUNO ALPHA III"
+        },
+        {
+            "code": "M2J",
+            "folder": "4. MORELIA Ⅱ Japan"
+        },
+        {
+            "code": "CN3J",
+            "folder": "5. MONARCIDA NEO III JAPAN"
+        },
+        {
+            "code": "C3JW",
+            "folder": "6. MONARCIDA NEO III WIDE JAPAN"
+        },
+        {
+            "code": "NSBJ_IN",
+            "folder": "7. MORELIA NEO SALA β JAPAN IN"
+        },
+        {
+            "code": "NSBJ_TF",
+            "folder": "8. MORELIA NEO SALA β JAPAN TF"
+        },
+        {
+            "code": "MRSJ_IN",
+            "folder": "9. MORELIA SALA JAPAN IN"
+        },
+        {
+            "code": "MRSJ_TF",
+            "folder": "10. MORELIA SALA JAPAN TF"
+        }
+    ]
+}

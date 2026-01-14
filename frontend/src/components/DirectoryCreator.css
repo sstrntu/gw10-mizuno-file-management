@@ -1,0 +1,305 @@
+.directory-creator {
+    background-color: var(--bg-card);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid var(--border-color);
+    position: relative;
+    overflow: auto;
+}
+
+.directory-creator::before {
+    content: 'CREATE_DIRS.EXE';
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+    z-index: 1;
+}
+
+.creator-header {
+    padding: 2rem 3rem;
+    border-bottom: 2px solid var(--border-color);
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, transparent 100%);
+}
+
+.creator-header h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    color: var(--accent-cyan);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.creator-header .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.creator-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow-y: auto;
+}
+
+.info-card {
+    background: var(--bg-darker);
+    color: var(--text-primary);
+    padding: 3rem;
+    border-bottom: 2px solid var(--border-color);
+    position: relative;
+}
+
+.info-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--primary-color));
+}
+
+.info-card h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.1em;
+    color: var(--accent-cyan);
+}
+
+.info-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.info-card li {
+    padding: 0.75rem 0;
+    padding-left: 2rem;
+    position: relative;
+    border-left: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.info-card li:hover {
+    border-left-color: var(--primary-color);
+    padding-left: 2.5rem;
+}
+
+.info-card li:before {
+    content: '▸';
+    position: absolute;
+    left: 0;
+    color: var(--primary-color);
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.action-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 3rem;
+    background:
+        repeating-linear-gradient(45deg,
+            transparent,
+            transparent 10px,
+            rgba(0, 255, 255, 0.02) 10px,
+            rgba(0, 255, 255, 0.02) 20px);
+}
+
+.create-button {
+    padding: 1.5rem 4rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--bg-dark);
+    background: var(--accent-cyan);
+    border: 3px solid var(--accent-cyan);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow:
+        0 0 30px rgba(0, 255, 255, 0.4),
+        inset 0 0 20px rgba(255, 255, 255, 0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.create-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.create-button:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.create-button:hover:not(:disabled) {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow:
+        0 0 50px rgba(0, 255, 255, 0.6),
+        inset 0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+.create-button:active:not(:disabled) {
+    transform: translateY(-2px) scale(1.02);
+}
+
+.create-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.button-icon {
+    font-size: 1.5rem;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 0 10px currentColor);
+}
+
+.spinner-small {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(10, 10, 10, 0.3);
+    border-top: 3px solid var(--bg-dark);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+.note {
+    margin-top: 2rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.result-box {
+    padding: 3rem;
+    border-top: 3px solid;
+    animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-darker);
+}
+
+.result-box.success {
+    border-top-color: var(--success-color);
+    background: linear-gradient(180deg, rgba(0, 255, 65, 0.1) 0%, var(--bg-darker) 100%);
+}
+
+.result-box.error {
+    border-top-color: var(--error-color);
+    background: linear-gradient(180deg, rgba(255, 0, 85, 0.1) 0%, var(--bg-darker) 100%);
+}
+
+.result-box h3 {
+    margin-bottom: 1.5rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.1em;
+}
+
+.result-box.success h3 {
+    color: var(--success-color);
+    text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+}
+
+.result-box.error h3 {
+    color: var(--error-color);
+    text-shadow: 0 0 20px rgba(255, 0, 85, 0.5);
+}
+
+.result-message {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 2rem;
+    letter-spacing: 0.05em;
+}
+
+.result-details {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.result-details p {
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    letter-spacing: 0.05em;
+}
+
+.sample-paths {
+    margin-top: 1.5rem;
+}
+
+.sample-paths ul {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+.sample-paths li {
+    padding: 0.75rem 1rem;
+    background-color: rgba(0, 255, 65, 0.05);
+    border-left: 3px solid var(--primary-color);
+    margin-bottom: 0.5rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    transition: all 0.3s;
+}
+
+.sample-paths li:hover {
+    background-color: rgba(0, 255, 65, 0.1);
+    padding-left: 1.5rem;
+}
+
+.sample-paths code {
+    color: var(--primary-color);
+}
+
+.more-paths {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.8rem;
+    margin-top: 1rem;
+    letter-spacing: 0.05em;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

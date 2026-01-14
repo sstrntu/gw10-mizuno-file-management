@@ -1,0 +1,12 @@
+{
+    "categories": {
+        "keyVisual": "1. Key Visual",
+        "techShots": "2. Tech Shots",
+        "supporting": "3. Supporting Images",
+        "carousel": "4. Carousel"
+    },
+    "kvSubfolders": {
+        "colorPack": "1. Color Pack",
+        "psd": "2. PSD"
+    }
+}

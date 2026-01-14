@@ -1,0 +1,134 @@
+{
+    "allowedExtensions": [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".psd"
+    ],
+    "rules": [
+        {
+            "id": "kv_color_pack",
+            "description": "Key Visual files containing _KV_Pack_",
+            "match": {
+                "contains": [
+                    "_KV_Pack_"
+                ],
+                "extensions": [
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".webp"
+                ]
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{KEY_VISUAL}",
+                "{KV_COLOR_PACK}"
+            ]
+        },
+        {
+            "id": "kv_psd",
+            "description": "Any _KV_ file with .psd extension",
+            "match": {
+                "contains": [
+                    "_KV_"
+                ],
+                "extensions": [
+                    ".psd"
+                ]
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{KEY_VISUAL}",
+                "{KV_PSD}"
+            ]
+        },
+        {
+            "id": "kv_model",
+            "description": "Any _KV_ file that contains a model code",
+            "match": {
+                "contains": [
+                    "_KV_"
+                ],
+                "requiresModelCode": true,
+                "extensions": [
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".webp"
+                ]
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{KEY_VISUAL}",
+                "{MODEL_FOLDER}"
+            ]
+        },
+        {
+            "id": "tech_shots",
+            "description": "T01–T05 per model",
+            "match": {
+                "codeRange": {
+                    "prefix": "T",
+                    "min": 1,
+                    "max": 5,
+                    "pad": 2
+                },
+                "requiresModelCode": true
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{TECH_SHOTS}",
+                "{MODEL_FOLDER}"
+            ]
+        },
+        {
+            "id": "supporting_images",
+            "description": "S01–S05 per model",
+            "match": {
+                "codeRange": {
+                    "prefix": "S",
+                    "min": 1,
+                    "max": 5,
+                    "pad": 2
+                },
+                "requiresModelCode": true
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{SUPPORTING}",
+                "{MODEL_FOLDER}"
+            ]
+        },
+        {
+            "id": "carousel",
+            "description": "Carousel files: .png or .psd, C01–C09 optional, no model code needed",
+            "match": {
+                "extensions": [
+                    ".png",
+                    ".psd"
+                ],
+                "anyOf": [
+                    {
+                        "contains": [
+                            "_CAROUSEL"
+                        ]
+                    },
+                    {
+                        "codeRange": {
+                            "prefix": "C",
+                            "min": 1,
+                            "max": 9,
+                            "pad": 2
+                        }
+                    }
+                ]
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{CAROUSEL}"
+            ]
+        }
+    ]
+}

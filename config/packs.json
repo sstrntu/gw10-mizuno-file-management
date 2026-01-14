@@ -1,0 +1,47 @@
+{
+    "packs": [
+        {
+            "id": "bright_gold",
+            "order": 1,
+            "folder": "1. Bright Gold Pack",
+            "keyTokens": [
+                "26SS",
+                "FTW",
+                "Bright",
+                "Gold"
+            ]
+        },
+        {
+            "id": "stargazer",
+            "order": 2,
+            "folder": "2. Stargazer Pack",
+            "keyTokens": [
+                "26SS",
+                "FTW",
+                "Stargazer"
+            ]
+        },
+        {
+            "id": "unity_sky",
+            "order": 3,
+            "folder": "3. Unity Sky Pack",
+            "keyTokens": [
+                "26SS",
+                "FTW",
+                "Unity",
+                "Sky"
+            ]
+        },
+        {
+            "id": "blazing_flair",
+            "order": 4,
+            "folder": "4. Blazing Flair Pack",
+            "keyTokens": [
+                "26SS",
+                "FTW",
+                "Blazing",
+                "Flair"
+            ]
+        }
+    ]
+}
