@@ -48,10 +48,16 @@ body {
 .app-header {
   background: var(--bg-darker);
   color: var(--primary-color);
-  padding: 2rem 3rem;
+  padding: 1rem 2rem;
   border-bottom: 3px solid var(--primary-color);
   position: relative;
   overflow: hidden;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .app-header::before {
@@ -81,15 +87,16 @@ body {
 
 .app-header h1 {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
   position: relative;
   z-index: 1;
   color: #ffffff;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  line-height: 1;
 }
 
 .subtitle {
@@ -100,6 +107,33 @@ body {
   position: relative;
   z-index: 1;
   color: #ffffff;
+  margin-top: 0.5rem;
+}
+
+.btn-view-config {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  color: var(--primary-color);
+  padding: 0.6rem 1.2rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+  font-weight: bold;
+  z-index: 10;
+  position: relative;
+}
+
+.btn-view-config:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
 .tab-navigation {

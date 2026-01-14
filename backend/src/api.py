@@ -127,6 +127,71 @@ def create_directories():
         }), 500
 
 
+def get_config_dir():
+    """Resolve config directory dynamically for Local vs Docker paths."""
+    src_dir = Path(__file__).parent
+    
+    # Check 3 levels up (Local: backend/src/api.py -> ROOT/config)
+    path_local = src_dir.parent.parent / 'config'
+    if path_local.exists() and path_local.is_dir():
+        return path_local
+
+    # Check 2 levels up (Docker: /app/src/api.py -> /app/config)
+    path_docker = src_dir.parent / 'config'
+    if path_docker.exists() and path_docker.is_dir():
+        return path_docker
+        
+    # Fallback to local default if neither found (or raising error)
+    return path_local
+
+@app.route('/api/config', methods=['GET'])
+def list_configs():
+    """List available config files."""
+    try:
+        config_dir = get_config_dir()
+        if not config_dir.exists():
+             return jsonify({"files": [], "error": "Config directory not found"}), 404
+             
+        files = [f.name for f in config_dir.glob('*.json')]
+        return jsonify({"files": sorted(files)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/config/<filename>', methods=['GET', 'POST'])
+def manage_config(filename):
+    """Read or update a config file."""
+    try:
+        config_dir = get_config_dir()
+        file_path = config_dir / filename
+        
+        # Security check: ensure file is in config dir
+        if not file_path.resolve().is_relative_to(config_dir.resolve()):
+            return jsonify({"error": "Access denied"}), 403
+            
+        if not file_path.exists():
+            return jsonify({"error": "File not found"}), 404
+
+        if request.method == 'GET':
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return jsonify({"content": content})
+            
+        elif request.method == 'POST':
+            data = request.get_json()
+            if 'content' not in data:
+                return jsonify({"error": "Missing content"}), 400
+            
+            # Write to file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(data['content'])
+                
+            return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == '__main__':
     print("Starting Filename Resolver API...")
     print("API available at: http://localhost:5001")

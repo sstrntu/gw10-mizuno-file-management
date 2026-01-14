@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: mizuno-backend-prod
+    command: gunicorn --bind 0.0.0.0:5001 --workers 4 --threads 2 src.api:app
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: always
+    networks:
+      - shared_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shared_network"
+      - "traefik.http.routers.mizuno-backend.rule=Host(`mz-file.turfmapp.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.mizuno-backend.entrypoints=websecure"
+      - "traefik.http.routers.mizuno-backend.tls.certresolver=myresolver"
+      - "traefik.http.services.mizuno-backend.loadbalancer.server.port=5001"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mizuno-frontend-prod
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - shared_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=shared_network"
+      - "traefik.http.routers.mizuno-frontend.rule=Host(`mz-file.turfmapp.com`)"
+      - "traefik.http.routers.mizuno-frontend.entrypoints=websecure"
+      - "traefik.http.routers.mizuno-frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.mizuno-frontend.loadbalancer.server.port=80"
+
+networks:
+  shared_network:
+    external: true
