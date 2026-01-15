@@ -27,6 +27,8 @@ export const API_ENDPOINTS = {
   AUTH_STATUS: `${API_BASE_URL}/api/auth/status`,
 
   // Phase 2 - Google Drive
+  DRIVE_STRUCTURE: `${API_BASE_URL}/api/drive/structure`,
   DRIVE_CHECK_STRUCTURE: `${API_BASE_URL}/api/drive/check-structure`,
   DRIVE_CREATE_DIRECTORIES: `${API_BASE_URL}/api/drive/create-directories`,
+  DRIVE_RESET_STRUCTURE: `${API_BASE_URL}/api/drive/reset-structure`,
 };

@@ -23,7 +23,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      scopes: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly',
+      scopes: 'https://www.googleapis.com/auth/drive',
       redirectTo: window.location.origin,
       queryParams: {
         access_type: 'offline',

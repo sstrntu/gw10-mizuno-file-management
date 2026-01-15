@@ -253,6 +253,155 @@ def get_drive_service_from_request():
     return DriveService(credentials), None
 
 
+@app.route('/api/drive/structure', methods=['GET'])
+@require_auth
+def drive_get_structure():
+    """
+    Get actual folder hierarchy from Google Drive.
+
+    Query params:
+        root_folder_id: The root folder ID to start from
+
+    Requires X-Google-Token header with Google access token.
+
+    Response JSON:
+        {
+            "success": true,
+            "name": "Root Folder",
+            "id": "folder_id",
+            "type": "directory",
+            "children": [...]
+        }
+    """
+    try:
+        drive, error = get_drive_service_from_request()
+        if not drive:
+            return jsonify({
+                "success": False,
+                "error": error,
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        root_folder_id = request.args.get('root_folder_id') or os.environ.get('DRIVE_ROOT_FOLDER_ID')
+
+        if not root_folder_id:
+            return jsonify({
+                "success": False,
+                "error": "No root folder ID provided. Set DRIVE_ROOT_FOLDER_ID or pass root_folder_id query param.",
+                "error_type": "CONFIG_ERROR"
+            }), 400
+
+        # Get max_depth from query params (default 10, batch fetch is fast)
+        max_depth = int(request.args.get('max_depth', 10))
+        hierarchy = drive.get_hierarchy(root_folder_id, max_depth=max_depth)
+
+        if 'error' in hierarchy:
+            return jsonify({
+                "success": False,
+                "error": hierarchy['error'],
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        return jsonify({
+            "success": True,
+            **hierarchy
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
+@app.route('/api/drive/test-access', methods=['POST'])
+@require_auth
+def drive_test_access():
+    """
+    Test Drive access and folder permissions.
+    Useful for debugging Shared Drive access issues.
+    """
+    try:
+        drive, error = get_drive_service_from_request()
+        if not drive:
+            return jsonify({
+                "success": False,
+                "error": error,
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        data = request.get_json() or {}
+        folder_id = data.get('folder_id') or os.environ.get('DRIVE_ROOT_FOLDER_ID')
+
+        if not folder_id:
+            return jsonify({
+                "success": False,
+                "error": "No folder ID provided",
+            }), 400
+
+        # Test 1: Get folder info
+        folder_info = drive.get_folder_info(folder_id)
+
+        # Test 2: List contents
+        try:
+            list_result = drive.service.files().list(
+                q=f"'{folder_id}' in parents and trashed = false",
+                spaces='drive',
+                fields='files(id, name)',
+                pageSize=5,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
+            can_list = True
+            list_error = None
+            files = list_result.get('files', [])
+        except Exception as e:
+            can_list = False
+            list_error = str(e)
+            files = []
+
+        # Test 3: Try to create a test folder
+        try:
+            test_folder = drive.service.files().create(
+                body={
+                    'name': '_test_folder_delete_me',
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [folder_id]
+                },
+                fields='id',
+                supportsAllDrives=True
+            ).execute()
+            can_create = True
+            create_error = None
+            # Delete the test folder
+            drive.service.files().delete(
+                fileId=test_folder['id'],
+                supportsAllDrives=True
+            ).execute()
+        except Exception as e:
+            can_create = False
+            create_error = str(e)
+
+        return jsonify({
+            "success": True,
+            "folder_id": folder_id,
+            "folder_info": folder_info,
+            "can_list": can_list,
+            "list_error": list_error,
+            "files_found": len(files),
+            "can_create": can_create,
+            "create_error": create_error
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
 @app.route('/api/drive/check-structure', methods=['POST'])
 @require_auth
 def drive_check_structure():
@@ -287,6 +436,16 @@ def drive_check_structure():
                 "error": "No root folder ID provided. Set DRIVE_ROOT_FOLDER_ID or pass root_folder_id.",
                 "error_type": "CONFIG_ERROR"
             }), 400
+
+        # Validate root folder exists and is accessible
+        folder_info = drive.get_folder_info(root_folder_id)
+        if not folder_info:
+            return jsonify({
+                "success": False,
+                "error": f"Root folder not found or not accessible. Folder ID: {root_folder_id}. "
+                         "Please verify the folder ID is correct and that your Google account has access to it.",
+                "error_type": "FOLDER_NOT_FOUND"
+            }), 404
 
         # If no paths provided, generate from config
         if not paths:
@@ -353,6 +512,23 @@ def drive_create_directories():
                 "error_type": "CONFIG_ERROR"
             }), 400
 
+        # Validate root folder exists and is accessible
+        folder_info = drive.get_folder_info(root_folder_id)
+        if not folder_info:
+            return jsonify({
+                "success": False,
+                "error": f"Root folder not found or not accessible. Folder ID: {root_folder_id}. "
+                         "Please verify the folder ID is correct and that your Google account has access to it.",
+                "error_type": "FOLDER_NOT_FOUND"
+            }), 404
+
+        if folder_info.get('trashed'):
+            return jsonify({
+                "success": False,
+                "error": f"Root folder '{folder_info.get('name')}' is in trash. Please restore it first.",
+                "error_type": "FOLDER_TRASHED"
+            }), 400
+
         # If no paths provided, generate from config
         if not paths:
             from src.directory_generator import generate_flat_paths
@@ -409,6 +585,100 @@ def drive_get_folder(folder_id):
         return jsonify({
             "success": False,
             "error": str(e)
+        }), 500
+
+
+@app.route('/api/drive/reset-structure', methods=['POST'])
+@require_auth
+def drive_reset_structure():
+    """
+    Delete all contents of the root folder and recreate the structure.
+
+    Request JSON:
+        {
+            "google_token": "google-access-token",
+            "root_folder_id": "root-folder-id",
+            "paths": [["Pack1", "SubFolder1"], ...],
+            "confirm_reset": true
+        }
+    """
+    try:
+        drive, error = get_drive_service_from_request()
+        if not drive:
+            return jsonify({
+                "success": False,
+                "error": error,
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        data = request.get_json() or {}
+        root_folder_id = data.get('root_folder_id') or os.environ.get('DRIVE_ROOT_FOLDER_ID')
+        paths = data.get('paths')
+        confirm_reset = data.get('confirm_reset', False)
+
+        if not root_folder_id:
+            return jsonify({
+                "success": False,
+                "error": "No root folder ID provided.",
+                "error_type": "CONFIG_ERROR"
+            }), 400
+
+        # Validate root folder exists and is accessible
+        folder_info = drive.get_folder_info(root_folder_id)
+        if not folder_info:
+            return jsonify({
+                "success": False,
+                "error": f"Root folder not found or not accessible. Folder ID: {root_folder_id}. "
+                         "Please verify the folder ID is correct and that your Google account has access to it.",
+                "error_type": "FOLDER_NOT_FOUND"
+            }), 404
+
+        if not confirm_reset:
+            return jsonify({
+                "success": False,
+                "error": "Reset confirmation required (confirm_reset=True)",
+                "error_type": "CONFIRMATION_REQUIRED"
+            }), 400
+
+        # 1. Delete all contents
+        delete_result = drive.delete_folder_contents(root_folder_id)
+        if not delete_result['success']:
+            return jsonify({
+                "success": False,
+                "error": f"Failed to empty folder: {delete_result.get('error')}",
+                "error_type": "DELETE_ERROR"
+            }), 500
+
+        # 2. Re-create structure
+        # If no paths provided, generate from config
+        if not paths:
+            from src.directory_generator import generate_flat_paths
+            path_strings = generate_flat_paths()
+            # Convert string paths to list of parts (skip root folder)
+            root_name = os.environ.get('DRIVE_ROOT_FOLDER', '26SS_FTW_Sell-in')
+            paths = []
+            for p in path_strings:
+                parts = p.split('/')
+                # Skip the root folder name if present
+                if parts and parts[0] == root_name:
+                    parts = parts[1:]
+                if parts:
+                    paths.append(parts)
+
+        create_result = drive.create_structure(paths, root_folder_id, dry_run=False)
+        create_result['success'] = True
+        create_result['reset_stats'] = {
+            'deleted': delete_result['deleted_count'],
+            'failed_delete': delete_result['failed_count']
+        }
+
+        return jsonify(create_result)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
         }), 500
 
 

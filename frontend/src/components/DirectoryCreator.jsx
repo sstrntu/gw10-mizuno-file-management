@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './DirectoryCreator.css'
 import { API_ENDPOINTS } from '../config/api'
-import { supabase } from '../config/supabase'
 
-function DirectoryCreator({ session }) {
+function DirectoryCreator({ session, onScanStart, onScanEnd, onScanComplete, rootFolderId, setRootFolderId }) {
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState(null)
-    const [dryRun, setDryRun] = useState(true)
-    const [mode, setMode] = useState('mock') // 'mock' or 'drive'
+    const [showResetConfirm, setShowResetConfirm] = useState(false)
+
+    // Default folder ID for display hint
+    const DEFAULT_ROOT_ID = '1cKccx5IF91I6kZrqBdSx8MPNirXAf2c5'
 
     const isAuthenticated = !!session?.user
     const hasGoogleToken = !!session?.provider_token
@@ -33,39 +34,34 @@ function DirectoryCreator({ session }) {
         setResult(null)
 
         try {
-            let endpoint, options
-
-            if (mode === 'drive' && isAuthenticated && hasGoogleToken) {
-                // Use real Google Drive API
-                endpoint = API_ENDPOINTS.DRIVE_CREATE_DIRECTORIES
-                options = {
+            // Assume Drive Mode
+            if (isAuthenticated && hasGoogleToken) {
+                const endpoint = API_ENDPOINTS.DRIVE_CREATE_DIRECTORIES
+                const options = {
                     method: 'POST',
                     headers: getAuthHeaders(),
                     body: JSON.stringify({
-                        dry_run: dryRun
+                        dry_run: false,
+                        root_folder_id: rootFolderId
                     })
                 }
-            } else {
-                // Use mock endpoint
-                endpoint = API_ENDPOINTS.CREATE_DIRECTORIES
-                options = {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+
+                const response = await fetch(endpoint, options)
+                const data = await response.json()
+
+                if (response.status === 401) {
+                    setResult({
+                        success: false,
+                        error: 'Not authenticated. Please login with Google first.'
+                    })
+                } else {
+                    setResult(data)
                 }
-            }
-
-            const response = await fetch(endpoint, options)
-            const data = await response.json()
-
-            if (response.status === 401) {
+            } else {
                 setResult({
                     success: false,
-                    error: 'Not authenticated. Please login with Google first.'
+                    error: 'Authentication required. Please login with Google to create directories.'
                 })
-            } else {
-                setResult(data)
             }
         } catch (error) {
             setResult({
@@ -88,12 +84,15 @@ function DirectoryCreator({ session }) {
 
         setLoading(true)
         setResult(null)
+        if (onScanStart) onScanStart()
 
         try {
             const response = await fetch(API_ENDPOINTS.DRIVE_CHECK_STRUCTURE, {
                 method: 'POST',
                 headers: getAuthHeaders(),
-                body: JSON.stringify({})
+                body: JSON.stringify({
+                    root_folder_id: rootFolderId
+                })
             })
 
             const data = await response.json()
@@ -101,10 +100,43 @@ function DirectoryCreator({ session }) {
                 ...data,
                 isCheckResult: true
             })
+            // Pass the hierarchy to the viewer
+            if (data.success && data.hierarchy && onScanComplete) {
+                onScanComplete(data.hierarchy)
+            }
         } catch (error) {
             setResult({
                 success: false,
                 error: `Failed to check structure: ${error.message}`,
+            })
+        } finally {
+            setLoading(false)
+            if (onScanEnd) onScanEnd()
+        }
+    }
+
+    const handleResetStructure = async () => {
+        setShowResetConfirm(false)
+        setLoading(true)
+        setResult(null)
+
+        try {
+            const response = await fetch(API_ENDPOINTS.DRIVE_RESET_STRUCTURE, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    root_folder_id: rootFolderId,
+                    confirm_reset: true
+                })
+            })
+
+            const data = await response.json()
+            setResult(data)
+
+        } catch (error) {
+            setResult({
+                success: false,
+                error: `Failed to reset structure: ${error.message}`,
             })
         } finally {
             setLoading(false)
@@ -115,206 +147,178 @@ function DirectoryCreator({ session }) {
         <div className="directory-creator">
             <div className="creator-header">
                 <h2>Directory Creation</h2>
-                <p className="subtitle">Create the complete folder structure for file organization</p>
+                <p className="subtitle">Create the complete folder hierarchy for file organization</p>
             </div>
 
             <div className="creator-content">
-                <div className="info-card">
-                    <h3>What This Does</h3>
-                    <ul>
-                        <li>Creates all pack folders (Bright Gold, Stargazer, Unity Sky, Blazing Flair)</li>
-                        <li>Creates category folders (Key Visual, Tech Shots, Supporting Images, Carousel)</li>
-                        <li>Creates model-specific folders within each category</li>
-                        <li>Sets up the complete directory hierarchy based on your configuration</li>
-                    </ul>
-                </div>
+                <div className="creator-panel controls-panel">
+                    {/* Drive Settings & Actions */}
+                    {hasGoogleToken ? (
+                        <div className="drive-actions-container">
+                            <div className="root-folder-input">
+                                <label htmlFor="root-id">Target Root Folder ID</label>
+                                <input
+                                    id="root-id"
+                                    type="text"
+                                    value={rootFolderId}
+                                    onChange={(e) => setRootFolderId(e.target.value)}
+                                    placeholder="Enter Google Drive Folder ID"
+                                />
+                                <p className="field-hint">Defaults to: {DEFAULT_ROOT_ID}</p>
+                            </div>
 
-                {/* Mode Selection */}
-                <div className="mode-selection">
-                    <h3>Operation Mode</h3>
-                    <div className="mode-options">
-                        <label className={`mode-option ${mode === 'mock' ? 'selected' : ''}`}>
-                            <input
-                                type="radio"
-                                name="mode"
-                                value="mock"
-                                checked={mode === 'mock'}
-                                onChange={(e) => setMode(e.target.value)}
-                            />
-                            <span className="mode-label">Mock (Testing)</span>
-                            <span className="mode-desc">Simulates folder creation without making changes</span>
-                        </label>
-                        <label className={`mode-option ${mode === 'drive' ? 'selected' : ''} ${!hasGoogleToken ? 'disabled' : ''}`}>
-                            <input
-                                type="radio"
-                                name="mode"
-                                value="drive"
-                                checked={mode === 'drive'}
-                                onChange={(e) => setMode(e.target.value)}
-                                disabled={!hasGoogleToken}
-                            />
-                            <span className="mode-label">
-                                Google Drive
-                                {!isAuthenticated && ' (Login Required)'}
-                                {isAuthenticated && !hasGoogleToken && ' (Re-login for Drive access)'}
-                            </span>
-                            <span className="mode-desc">Creates actual folders in your Google Drive</span>
-                        </label>
-                    </div>
-                </div>
+                            <div className="action-row">
+                                <button
+                                    onClick={handleCreateDirectories}
+                                    disabled={loading}
+                                    className="create-button"
+                                >
+                                    {loading ? 'Creating...' : 'Create Structure'}
+                                </button>
+                                <button
+                                    onClick={handleCheckStructure}
+                                    disabled={loading}
+                                    className="check-button"
+                                >
+                                    {loading ? 'Checking...' : 'Scan / Check Status'}
+                                </button>
 
-                {/* Dry Run Toggle (only for Drive mode) */}
-                {mode === 'drive' && hasGoogleToken && (
-                    <div className="dry-run-toggle">
-                        <label>
-                            <input
-                                type="checkbox"
-                                checked={dryRun}
-                                onChange={(e) => setDryRun(e.target.checked)}
-                            />
-                            <span>Dry Run Mode</span>
-                            <span className="toggle-desc">
-                                {dryRun ? 'Preview what would be created (no changes made)' : 'Actually create folders in Drive'}
-                            </span>
-                        </label>
-                    </div>
-                )}
+                                {/* Sync Button (only enabled if we did a check and found missing items) */}
+                                {result?.isCheckResult && result?.summary?.missing_count > 0 && (
+                                    <button
+                                        onClick={handleCreateDirectories}
+                                        disabled={loading}
+                                        className="sync-button"
+                                        title="Add only missing folders, keep existing files"
+                                    >
+                                        Sync Missing Folders ({result.summary.missing_count})
+                                    </button>
+                                )}
+                            </div>
 
-                <div className="action-section">
-                    {mode === 'drive' && hasGoogleToken && (
-                        <button
-                            onClick={handleCheckStructure}
-                            disabled={loading}
-                            className="check-button"
-                        >
-                            {loading ? 'Checking...' : 'Check Existing Structure'}
-                        </button>
+                            <div className="destructive-zone">
+                                <h4>Destructive Actions</h4>
+                                <button
+                                    onClick={() => setShowResetConfirm(true)}
+                                    disabled={loading}
+                                    className="reset-button"
+                                >
+                                    Reset & Recreate Structure
+                                </button>
+                                <p className="warning-text">Warning: This will delete ALL files in the target folder.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="auth-required-state">
+                            <p>Authentication Required</p>
+                            <p className="sub-text">Please log in with Google to manage directory structure.</p>
+                        </div>
                     )}
-                    <button
-                        onClick={handleCreateDirectories}
-                        disabled={loading}
-                        className={`create-button ${mode === 'drive' && !dryRun ? 'warning' : ''}`}
-                    >
-                        {loading ? (
-                            <>
-                                <span className="spinner-small"></span>
-                                {mode === 'drive' ? (dryRun ? 'Previewing...' : 'Creating...') : 'Processing...'}
-                            </>
-                        ) : (
-                            <>
-                                {mode === 'mock' && 'Run Mock Creation'}
-                                {mode === 'drive' && dryRun && 'Preview Drive Creation'}
-                                {mode === 'drive' && !dryRun && 'Create in Google Drive'}
-                            </>
-                        )}
-                    </button>
-
-                    <p className="note">
-                        {mode === 'mock' && 'This is a mock operation for testing. No actual folders will be created.'}
-                        {mode === 'drive' && dryRun && 'Dry run mode: Shows what would be created without making changes.'}
-                        {mode === 'drive' && !dryRun && 'WARNING: This will create actual folders in your Google Drive!'}
-                    </p>
                 </div>
 
-                {result && (
-                    <div className={`result-box ${result.success ? 'success' : 'error'}`}>
-                        {result.success ? (
-                            <>
-                                {/* Check Structure Results */}
-                                {result.isCheckResult ? (
-                                    <>
-                                        <h3>Structure Check Complete</h3>
-                                        <div className="result-details">
-                                            <div className="summary-stats">
-                                                <div className="stat">
-                                                    <span className="stat-value">{result.summary?.total || 0}</span>
-                                                    <span className="stat-label">Total Paths</span>
-                                                </div>
-                                                <div className="stat existing">
-                                                    <span className="stat-value">{result.summary?.existing_count || 0}</span>
-                                                    <span className="stat-label">Existing</span>
-                                                </div>
-                                                <div className="stat missing">
-                                                    <span className="stat-value">{result.summary?.missing_count || 0}</span>
-                                                    <span className="stat-label">Missing</span>
-                                                </div>
-                                            </div>
-                                            {result.missing && result.missing.length > 0 && (
-                                                <div className="missing-paths">
-                                                    <p><strong>Missing Folders (first 10):</strong></p>
-                                                    <ul>
-                                                        {result.missing.slice(0, 10).map((item, index) => (
-                                                            <li key={index}>
-                                                                <code>{item.path}</code>
-                                                                <span className="missing-from">from: {item.missing_from}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                    {result.missing.length > 10 && (
-                                                        <p className="more-paths">...and {result.missing.length - 10} more</p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        {/* Creation Results */}
-                                        <h3>{result.dry_run ? 'Preview Complete' : 'Creation Complete'}</h3>
-                                        {result.message && <p className="result-message">{result.message}</p>}
-                                        <div className="result-details">
-                                            {result.summary ? (
+                <div className="creator-panel results-panel">
+                    {/* Results Display */}
+                    {result ? (
+                        <div className={`result-box ${result.success ? 'success' : 'error'}`}>
+                            {result.success ? (
+                                <>
+                                    {result.isCheckResult ? (
+                                        <>
+                                            <h3>Structure Check Complete</h3>
+                                            <div className="result-details">
                                                 <div className="summary-stats">
-                                                    <div className="stat">
-                                                        <span className="stat-value">{result.summary.total_paths || 0}</span>
-                                                        <span className="stat-label">Total Paths</span>
+                                                    <div className="stat existing">
+                                                        <span className="stat-value">{result.summary?.existing_count || 0}</span>
+                                                        <span className="stat-label">Existing</span>
+                                                    </div>
+                                                    <div className={`stat missing ${result.summary?.missing_count > 0 ? 'alert' : ''}`}>
+                                                        <span className="stat-value">{result.summary?.missing_count || 0}</span>
+                                                        <span className="stat-label">Missing</span>
+                                                    </div>
+                                                </div>
+                                                {result.missing && result.missing.length > 0 && (
+                                                    <div className="missing-paths">
+                                                        <p><strong>Missing Folders:</strong></p>
+                                                        <ul>
+                                                            {result.missing.slice(0, 15).map((item, index) => (
+                                                                <li key={index}>
+                                                                    <code>{item.path}</code>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                        {result.missing.length > 15 && (
+                                                            <p className="more-paths">...and {result.missing.length - 15} more</p>
+                                                        )}
+                                                        <p className="check-hint">Use "Sync Missing" to create these folders.</p>
+                                                    </div>
+                                                )}
+                                                {result.missing?.length === 0 && (
+                                                    <p className="success-msg">Base structure is complete!</p>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : result.reset_stats ? (
+                                        <>
+                                            <h3>Reset Complete</h3>
+                                            <div className="result-details">
+                                                <p className="success-msg">Structure recreated successfully.</p>
+                                                <div className="summary-stats">
+                                                    <div className="stat failed">
+                                                        <span className="stat-value">{result.reset_stats.deleted}</span>
+                                                        <span className="stat-label">Deleted</span>
                                                     </div>
                                                     <div className="stat created">
-                                                        <span className="stat-value">{result.summary.created || 0}</span>
+                                                        <span className="stat-value">{result.summary?.created || 0}</span>
+                                                        <span className="stat-label">Created</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h3>{result.dry_run ? 'Dry Run Complete' : 'Creation Complete'}</h3>
+                                            <div className="result-details">
+                                                <div className="summary-stats">
+                                                    <div className="stat created">
+                                                        <span className="stat-value">{result.summary?.created || 0}</span>
                                                         <span className="stat-label">{result.dry_run ? 'Would Create' : 'Created'}</span>
                                                     </div>
-                                                    <div className="stat skipped">
-                                                        <span className="stat-value">{result.summary.skipped || 0}</span>
-                                                        <span className="stat-label">Already Exist</span>
-                                                    </div>
-                                                    {result.summary.failed > 0 && (
-                                                        <div className="stat failed">
-                                                            <span className="stat-value">{result.summary.failed}</span>
-                                                            <span className="stat-label">Failed</span>
-                                                        </div>
-                                                    )}
                                                 </div>
-                                            ) : (
-                                                <>
-                                                    <p><strong>Total Directories:</strong> {result.count}</p>
-                                                    {result.paths && result.paths.length > 0 && (
-                                                        <div className="sample-paths">
-                                                            <p><strong>Sample Paths:</strong></p>
-                                                            <ul>
-                                                                {result.paths.map((path, index) => (
-                                                                    <li key={index}><code>{path}</code></li>
-                                                                ))}
-                                                            </ul>
-                                                            {result.count > result.paths.length && (
-                                                                <p className="more-paths">...and {result.count - result.paths.length} more</p>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <h3>Error</h3>
-                                <p className="result-message">{result.error}</p>
-                            </>
-                        )}
-                    </div>
-                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <h3>Error</h3>
+                                    <p className="result-message">{result.error}</p>
+                                </>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="empty-state">
+                            <p>Ready to scan.</p>
+                            <p className="sub-text">Select a mode and click Scan to see the directory status here.</p>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* Confirmation Modal */}
+            {showResetConfirm && (
+                <div className="modal-overlay">
+                    <div className="modal-content warning-modal">
+                        <h3>⚠️ Danger Zone</h3>
+                        <p>Are you sure you want to <strong>WIPE ALL CONTENTS</strong> of the target folder?</p>
+                        <p>Folder ID: <code>{rootFolderId}</code></p>
+                        <p>This action cannot be undone. All files and subfolders will be permanently deleted.</p>
+                        <div className="modal-actions">
+                            <button onClick={() => setShowResetConfirm(false)} className="btn-cancel">Cancel</button>
+                            <button onClick={handleResetStructure} className="btn-confirm-delete">Yes, Delete Everything</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

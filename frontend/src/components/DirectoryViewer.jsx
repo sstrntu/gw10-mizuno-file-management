@@ -1,38 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './DirectoryViewer.css'
-import { API_ENDPOINTS } from '../config/api'
 import DirectoryCreator from './DirectoryCreator'
+
+// Default folder ID from requirements
+const DEFAULT_ROOT_ID = '1cKccx5IF91I6kZrqBdSx8MPNirXAf2c5'
 
 function DirectoryViewer({ session }) {
     const [structure, setStructure] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)
+    const [loading, setLoading] = useState(false)
     const [expandedNodes, setExpandedNodes] = useState(new Set())
+    const [rootFolderId, setRootFolderId] = useState(DEFAULT_ROOT_ID)
+    const [hasScanned, setHasScanned] = useState(false)
 
-    useEffect(() => {
-        fetchStructure()
-    }, [])
-
-    const fetchStructure = async () => {
-        setLoading(true)
-        setError(null)
-
-        try {
-            const response = await fetch(API_ENDPOINTS.STRUCTURE)
-            const data = await response.json()
-
-            if (response.ok) {
-                setStructure(data)
-                // Expand root by default
-                setExpandedNodes(new Set([data.name]))
-            } else {
-                setError(data.error || 'Failed to load directory structure')
-            }
-        } catch (err) {
-            setError(`Failed to connect to backend: ${err.message}`)
-        } finally {
-            setLoading(false)
+    // Called when scan completes with hierarchy data
+    const handleScanComplete = (hierarchy) => {
+        if (hierarchy) {
+            setStructure(hierarchy)
+            setExpandedNodes(new Set([hierarchy.name]))
+            setHasScanned(true)
         }
+    }
+
+    // Called when scan starts
+    const handleScanStart = () => {
+        setLoading(true)
+    }
+
+    // Called when scan ends (success or failure)
+    const handleScanEnd = () => {
+        setLoading(false)
     }
 
     const toggleNode = (nodePath) => {
@@ -76,50 +72,45 @@ function DirectoryViewer({ session }) {
         )
     }
 
-    if (loading) {
-        return (
-            <div className="directory-viewer">
-                <div className="loading">
-                    <div className="spinner"></div>
-                    <p>Loading directory structure...</p>
-                </div>
-            </div>
-        )
-    }
-
-    if (error) {
-        return (
-            <div className="directory-viewer">
-                <div className="error-box">
-                    <h3>Error</h3>
-                    <p>{error}</p>
-                    <button onClick={fetchStructure} className="retry-button">
-                        Retry
-                    </button>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className="directory-viewer">
+            {/* Directory Creation Section (Top) */}
+            <DirectoryCreator
+                session={session}
+                onScanStart={handleScanStart}
+                onScanEnd={handleScanEnd}
+                onScanComplete={handleScanComplete}
+                rootFolderId={rootFolderId}
+                setRootFolderId={setRootFolderId}
+            />
+
             <div className="viewer-header">
                 <h2>Directory Structure</h2>
-                <p className="subtitle">Complete folder hierarchy for file organization</p>
+                <p className="subtitle">Live view from Google Drive</p>
             </div>
 
             <div className="tree-container">
-                {structure && renderNode(structure)}
+                {loading && (
+                    <div className="loading-inline">
+                        <div className="spinner"></div>
+                        <p>Loading directory structure...</p>
+                    </div>
+                )}
+
+                {!loading && !hasScanned && (
+                    <div className="empty-state">
+                        <p>Click "Scan / Check Status" to view the directory structure from Google Drive.</p>
+                    </div>
+                )}
+
+                {!loading && hasScanned && structure && renderNode(structure)}
             </div>
 
             <div className="viewer-info">
                 <p className="info-text">
-                    Click on folders to expand/collapse. This structure is generated from your configuration files.
+                    Click on folders to expand/collapse.
                 </p>
             </div>
-
-            {/* Use DirectoryCreator component with session */}
-            <DirectoryCreator session={session} />
         </div>
     )
 }

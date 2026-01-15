@@ -52,7 +52,9 @@ class DriveService:
                 q=query,
                 spaces='drive',
                 fields='files(id, name, parents)',
-                pageSize=1
+                pageSize=1,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
             ).execute()
 
             files = results.get('files', [])
@@ -75,11 +77,33 @@ class DriveService:
         try:
             file = self.service.files().get(
                 fileId=folder_id,
-                fields='id, trashed'
+                fields='id, trashed',
+                supportsAllDrives=True
             ).execute()
             return not file.get('trashed', False)
         except HttpError:
             return False
+
+    def get_folder_info(self, folder_id: str) -> Optional[Dict]:
+        """
+        Get folder information by ID.
+
+        Args:
+            folder_id: Google Drive folder ID
+
+        Returns:
+            Dict with folder info or None if not found/accessible
+        """
+        try:
+            file = self.service.files().get(
+                fileId=folder_id,
+                fields='id, name, mimeType, trashed, capabilities',
+                supportsAllDrives=True
+            ).execute()
+            return file
+        except HttpError as e:
+            print(f"Error getting folder info for '{folder_id}': {e}")
+            return None
 
     def create_folder(self, name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """
@@ -103,7 +127,8 @@ class DriveService:
 
             folder = self.service.files().create(
                 body=file_metadata,
-                fields='id'
+                fields='id',
+                supportsAllDrives=True
             ).execute()
 
             return folder.get('id')
@@ -197,34 +222,55 @@ class DriveService:
     ) -> Dict:
         """
         Check which paths exist and which need to be created.
+        Uses optimized batch fetching for speed.
+        Also returns the folder hierarchy for display.
 
         Args:
             paths: List of paths (each path is a list of folder names)
             root_folder_id: ID of the root folder
 
         Returns:
-            Dict with 'existing', 'missing', and 'summary'
+            Dict with 'existing', 'missing', 'summary', and 'hierarchy'
         """
+        # Get root folder info
+        try:
+            root_info = self.service.files().get(
+                fileId=root_folder_id,
+                fields='id, name, mimeType',
+                supportsAllDrives=True
+            ).execute()
+        except HttpError as e:
+            return {
+                'existing': [],
+                'missing': [],
+                'summary': {'total': 0, 'existing_count': 0, 'missing_count': 0},
+                'hierarchy': {'name': 'Error', 'id': root_folder_id, 'type': 'directory', 'children': [], 'error': str(e)}
+            }
+
+        # Fetch all folders at once using batch approach
+        all_folders = self._fetch_all_folders_flat(root_folder_id)
+
+        # Build lookup: parent_id -> {folder_name -> folder_id}
+        children_by_parent: Dict[str, Dict[str, str]] = {}
+        for folder in all_folders:
+            for parent_id in folder.get('parents', []):
+                if parent_id not in children_by_parent:
+                    children_by_parent[parent_id] = {}
+                children_by_parent[parent_id][folder['name']] = folder['id']
+
         existing_paths = []
         missing_paths = []
 
-        # Cache folder lookups to avoid redundant API calls
-        folder_cache: Dict[str, Optional[str]] = {}  # "parent_id/name" -> folder_id
-
+        # Check each path against the in-memory structure
         for path_parts in paths:
             current_parent_id = root_folder_id
             path_exists = True
             first_missing_idx = -1
 
             for idx, folder_name in enumerate(path_parts):
-                cache_key = f"{current_parent_id}/{folder_name}"
-
-                if cache_key in folder_cache:
-                    folder_id = folder_cache[cache_key]
-                else:
-                    existing = self.get_folder_by_name(folder_name, current_parent_id)
-                    folder_id = existing['id'] if existing else None
-                    folder_cache[cache_key] = folder_id
+                # Look up in memory
+                parent_children = children_by_parent.get(current_parent_id, {})
+                folder_id = parent_children.get(folder_name)
 
                 if folder_id:
                     current_parent_id = folder_id
@@ -247,6 +293,9 @@ class DriveService:
                     'missing_parts': path_parts[first_missing_idx:] if first_missing_idx >= 0 else path_parts
                 })
 
+        # Build hierarchy from the already-fetched folders
+        hierarchy = self._build_tree_from_flat(root_info, all_folders, max_depth=10)
+
         return {
             'existing': existing_paths,
             'missing': missing_paths,
@@ -254,7 +303,8 @@ class DriveService:
                 'total': len(paths),
                 'existing_count': len(existing_paths),
                 'missing_count': len(missing_paths)
-            }
+            },
+            'hierarchy': hierarchy
         }
 
     def create_structure(
@@ -265,6 +315,7 @@ class DriveService:
     ) -> Dict:
         """
         Create folder structure for all paths.
+        Uses optimized batch fetching to check existing folders first.
 
         Args:
             paths: List of paths (each path is a list of folder names)
@@ -279,7 +330,18 @@ class DriveService:
         skipped_count = 0
         failed_count = 0
 
-        # Cache to track already created folders in this session
+        # Batch fetch all existing folders first
+        all_folders = self._fetch_all_folders_flat(root_folder_id)
+
+        # Build lookup: parent_id -> {folder_name -> folder_id}
+        children_by_parent: Dict[str, Dict[str, str]] = {}
+        for folder in all_folders:
+            for parent_id in folder.get('parents', []):
+                if parent_id not in children_by_parent:
+                    children_by_parent[parent_id] = {}
+                children_by_parent[parent_id][folder['name']] = folder['id']
+
+        # Session cache for newly created folders
         session_cache: Dict[str, str] = {}  # "parent_id/name" -> folder_id
 
         for path_parts in paths:
@@ -293,7 +355,7 @@ class DriveService:
             for folder_name in path_parts:
                 cache_key = f"{current_parent_id}/{folder_name}"
 
-                # Check session cache first
+                # Check session cache first (for newly created folders)
                 if cache_key in session_cache:
                     path_result['folders'].append({
                         'name': folder_name,
@@ -304,17 +366,18 @@ class DriveService:
                     skipped_count += 1
                     continue
 
-                # Check if folder exists in Drive
-                existing = self.get_folder_by_name(folder_name, current_parent_id)
+                # Check in-memory lookup (from batch fetch)
+                parent_children = children_by_parent.get(current_parent_id, {})
+                existing_id = parent_children.get(folder_name)
 
-                if existing:
-                    session_cache[cache_key] = existing['id']
+                if existing_id:
+                    session_cache[cache_key] = existing_id
                     path_result['folders'].append({
                         'name': folder_name,
                         'status': 'exists',
-                        'id': existing['id']
+                        'id': existing_id
                     })
-                    current_parent_id = existing['id']
+                    current_parent_id = existing_id
                     skipped_count += 1
                 else:
                     if dry_run:
@@ -330,6 +393,10 @@ class DriveService:
                         new_id = self.create_folder(folder_name, current_parent_id)
                         if new_id:
                             session_cache[cache_key] = new_id
+                            # Also add to in-memory lookup for subsequent paths
+                            if current_parent_id not in children_by_parent:
+                                children_by_parent[current_parent_id] = {}
+                            children_by_parent[current_parent_id][folder_name] = new_id
                             path_result['folders'].append({
                                 'name': folder_name,
                                 'status': 'created',
@@ -359,3 +426,210 @@ class DriveService:
                 'failed': failed_count
             }
         }
+
+    def delete_folder_contents(self, folder_id: str) -> Dict[str, int]:
+        """
+        Delete all contents (files and subfolders) within a folder.
+
+        Args:
+            folder_id: ID of the folder to empty
+
+        Returns:
+            Dict with 'deleted_count' and 'failed_count'
+        """
+        deleted = 0
+        failed = 0
+
+        try:
+            # List all children
+            query = f"'{folder_id}' in parents and trashed = false"
+            
+            page_token = None
+            while True:
+                results = self.service.files().list(
+                    q=query,
+                    spaces='drive',
+                    fields='nextPageToken, files(id, name, mimeType)',
+                    pageToken=page_token,
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True
+                ).execute()
+
+                items = results.get('files', [])
+
+                for item in items:
+                    try:
+                        self.service.files().delete(fileId=item['id'], supportsAllDrives=True).execute()
+                        deleted += 1
+                        print(f"Deleted: {item['name']} ({item['id']})")
+                    except Exception as e:
+                        print(f"Failed to delete {item['name']}: {e}")
+                        failed += 1
+
+                page_token = results.get('nextPageToken')
+                if not page_token:
+                    break
+
+            return {
+                'success': True,
+                'deleted_count': deleted,
+                'failed_count': failed
+            }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'deleted_count': deleted,
+                'failed_count': failed
+            }
+
+    def get_hierarchy(self, folder_id: str, max_depth: int = 10) -> Dict:
+        """
+        Fetch folder hierarchy from Google Drive using optimized batch approach.
+        Fetches all folders in one query and builds tree in memory.
+
+        Args:
+            folder_id: ID of the root folder to start from
+            max_depth: Maximum depth to recurse (default 10)
+
+        Returns:
+            Dict with folder tree structure:
+            {
+                "name": "folder_name",
+                "id": "folder_id",
+                "type": "directory",
+                "children": [...]
+            }
+        """
+        try:
+            # Get the root folder info
+            root_info = self.service.files().get(
+                fileId=folder_id,
+                fields='id, name, mimeType',
+                supportsAllDrives=True
+            ).execute()
+
+            # Fetch ALL subfolders in one batch query
+            all_folders = self._fetch_all_folders_flat(folder_id)
+
+            # Build tree structure in memory
+            return self._build_tree_from_flat(root_info, all_folders, max_depth)
+
+        except HttpError as e:
+            return {
+                'name': 'Error',
+                'id': folder_id,
+                'type': 'directory',
+                'children': [],
+                'error': str(e)
+            }
+
+    def _fetch_all_folders_flat(self, root_folder_id: str) -> List[Dict]:
+        """
+        Fetch all folders under a root folder in a single paginated query.
+        Much faster than recursive calls.
+
+        Args:
+            root_folder_id: The root folder ID
+
+        Returns:
+            List of all folder metadata dicts with id, name, parents
+        """
+        all_folders = []
+
+        # Query for all folders - we'll filter by ancestry in memory
+        # For Shared Drives, we need to get folders that have any parent in our tree
+        folders_to_check = [root_folder_id]
+        checked_folders = set()
+
+        while folders_to_check:
+            # Build query for current batch of parent folders
+            parent_queries = [f"'{pid}' in parents" for pid in folders_to_check if pid not in checked_folders]
+            if not parent_queries:
+                break
+
+            checked_folders.update(folders_to_check)
+            folders_to_check = []
+
+            # Process in chunks to avoid query length limits
+            chunk_size = 10
+            for i in range(0, len(parent_queries), chunk_size):
+                chunk = parent_queries[i:i + chunk_size]
+                query = f"({' or '.join(chunk)}) and mimeType = '{self.FOLDER_MIME_TYPE}' and trashed = false"
+
+                page_token = None
+                while True:
+                    try:
+                        results = self.service.files().list(
+                            q=query,
+                            spaces='drive',
+                            fields='nextPageToken, files(id, name, parents)',
+                            pageSize=1000,
+                            pageToken=page_token,
+                            supportsAllDrives=True,
+                            includeItemsFromAllDrives=True
+                        ).execute()
+
+                        new_folders = results.get('files', [])
+                        all_folders.extend(new_folders)
+
+                        # Add new folder IDs to check for their children
+                        for folder in new_folders:
+                            if folder['id'] not in checked_folders:
+                                folders_to_check.append(folder['id'])
+
+                        page_token = results.get('nextPageToken')
+                        if not page_token:
+                            break
+                    except HttpError as e:
+                        print(f"Error fetching folders: {e}")
+                        break
+
+        return all_folders
+
+    def _build_tree_from_flat(self, root_info: Dict, all_folders: List[Dict], max_depth: int) -> Dict:
+        """
+        Build tree structure from flat list of folders.
+
+        Args:
+            root_info: Root folder metadata
+            all_folders: Flat list of all folder metadata
+            max_depth: Maximum tree depth
+
+        Returns:
+            Tree structure dict
+        """
+        # Create lookup maps
+        folders_by_id = {f['id']: f for f in all_folders}
+        children_by_parent = {}
+
+        for folder in all_folders:
+            for parent_id in folder.get('parents', []):
+                if parent_id not in children_by_parent:
+                    children_by_parent[parent_id] = []
+                children_by_parent[parent_id].append(folder)
+
+        # Sort children by name
+        for parent_id in children_by_parent:
+            children_by_parent[parent_id].sort(key=lambda f: f.get('name', '').lower())
+
+        # Build tree recursively from memory
+        def build_node(folder_info: Dict, depth: int) -> Dict:
+            node = {
+                'name': folder_info.get('name', 'Unknown'),
+                'id': folder_info.get('id'),
+                'type': 'directory',
+                'children': []
+            }
+
+            if depth >= max_depth:
+                return node
+
+            children = children_by_parent.get(folder_info['id'], [])
+            for child in children:
+                node['children'].append(build_node(child, depth + 1))
+
+            return node
+
+        return build_node(root_info, 0)
