@@ -4,15 +4,34 @@ import DirectoryViewer from './components/DirectoryViewer'
 import FileUploadTester from './components/FileUploadTester'
 import QCMatrix from './components/QCMatrix'
 import ConfigViewer from './components/ConfigViewer'
+import AuthStatus from './components/AuthStatus'
+import LoginPage from './components/LoginPage'
+import { useAuth } from './hooks/useAuth'
 
 function App() {
+  const { user, session, loading, signOut } = useAuth()
   const [activeTab, setActiveTab] = useState('structure')
   const [showConfig, setShowConfig] = useState(false)
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="app-loading">
+        <div className="loading-spinner">Loading...</div>
+      </div>
+    )
+  }
+
+  // Not authenticated -> Show Login Page
+  if (!user) {
+    return <LoginPage />
+  }
+
+  // Authenticated -> Show Main App
   const tabs = [
-    { id: 'structure', label: 'Directory Structure', icon: '📂' },
-    { id: 'upload', label: 'File Upload Test', icon: '📤' },
-    { id: 'qc', label: 'QC Matrix', icon: '🔍' },
+    { id: 'structure', label: 'Directory Structure', icon: '>' },
+    { id: 'upload', label: 'File Upload Test', icon: '+' },
+    { id: 'qc', label: 'QC Matrix', icon: '#' },
   ]
 
   return (
@@ -23,13 +42,16 @@ function App() {
             <h1>File and QC Management</h1>
             <p className="subtitle">Directory Structure & File Upload Management System</p>
           </div>
-          <button
-            className="btn-view-config"
-            onClick={() => setShowConfig(true)}
-            title="View Configuration Files"
-          >
-            ⚙️ View Config
-          </button>
+          <div className="header-actions">
+            <AuthStatus user={user} onLogout={signOut} />
+            <button
+              className="btn-view-config"
+              onClick={() => setShowConfig(true)}
+              title="View Configuration Files"
+            >
+              View Config
+            </button>
+          </div>
         </div>
       </header>
 
@@ -47,8 +69,8 @@ function App() {
       </nav>
 
       <main className="app-main">
-        {activeTab === 'structure' && <DirectoryViewer />}
-        {activeTab === 'upload' && <FileUploadTester />}
+        {activeTab === 'structure' && <DirectoryViewer session={session} />}
+        {activeTab === 'upload' && <FileUploadTester session={session} />}
         {activeTab === 'qc' && <QCMatrix />}
       </main>
 
@@ -57,7 +79,7 @@ function App() {
 
 
       <footer className="app-footer">
-        <p>Mizuno File Management System - Phase 1 Enhanced</p>
+        <p>Mizuno File Management System - Phase 2 (Supabase + Google Drive)</p>
       </footer>
     </div>
   )

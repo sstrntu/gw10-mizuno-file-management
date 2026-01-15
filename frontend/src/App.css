@@ -60,6 +60,14 @@ body {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+  z-index: 10;
+}
+
 .app-header::before {
   content: '';
   position: absolute;

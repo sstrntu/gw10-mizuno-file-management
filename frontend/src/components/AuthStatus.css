@@ -1,0 +1,106 @@
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: 'Space Mono', monospace;
+  border: 1px solid var(--border-color, #333);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.auth-status.loading {
+  color: #888;
+}
+
+.auth-status.authenticated {
+  border-color: var(--primary-color, #00ff41);
+  color: var(--primary-color, #00ff41);
+}
+
+.auth-status.not-authenticated {
+  border-color: var(--warning-color, #ffaa00);
+  color: var(--warning-color, #ffaa00);
+}
+
+.auth-status .status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.auth-status.authenticated .status-icon {
+  background: var(--primary-color, #00ff41);
+  color: #000;
+}
+
+.auth-status.not-authenticated .status-icon {
+  background: var(--warning-color, #ffaa00);
+  color: #000;
+}
+
+.auth-status .status-text {
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+}
+
+.auth-status .btn-login,
+.auth-status .btn-logout {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 1px solid;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: 'Space Mono', monospace;
+}
+
+.auth-status .btn-login {
+  background: transparent;
+  border-color: var(--accent-cyan, #00ffff);
+  color: var(--accent-cyan, #00ffff);
+}
+
+.auth-status .btn-login:hover {
+  background: rgba(0, 255, 255, 0.1);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+.auth-status .btn-logout {
+  background: transparent;
+  border-color: var(--error-color, #ff0055);
+  color: var(--error-color, #ff0055);
+}
+
+.auth-status .btn-logout:hover {
+  background: rgba(255, 0, 85, 0.1);
+  box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+}
+
+.auth-status .auth-error {
+  color: var(--error-color, #ff0055);
+  font-size: 0.7rem;
+}
+
+.drive-badge {
+  display: inline-block;
+  background: var(--accent-cyan, #00ffff);
+  color: #000;
+  font-size: 0.6rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-weight: 700;
+  vertical-align: middle;
+}

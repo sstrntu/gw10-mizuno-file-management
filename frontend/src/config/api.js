@@ -13,8 +13,20 @@ const getApiBaseUrl = () => {
 export const API_BASE_URL = getApiBaseUrl();
 
 export const API_ENDPOINTS = {
+  // Health check
   HEALTH: `${API_BASE_URL}/api/health`,
+
+  // Phase 1 - Resolution
   STRUCTURE: `${API_BASE_URL}/api/structure`,
   RESOLVE: `${API_BASE_URL}/api/resolve`,
   CREATE_DIRECTORIES: `${API_BASE_URL}/api/create-directories`,
+
+  // Phase 2 - Authentication
+  AUTH_LOGIN: `${API_BASE_URL}/api/auth/login`,
+  AUTH_LOGOUT: `${API_BASE_URL}/api/auth/logout`,
+  AUTH_STATUS: `${API_BASE_URL}/api/auth/status`,
+
+  // Phase 2 - Google Drive
+  DRIVE_CHECK_STRUCTURE: `${API_BASE_URL}/api/drive/check-structure`,
+  DRIVE_CREATE_DIRECTORIES: `${API_BASE_URL}/api/drive/create-directories`,
 };

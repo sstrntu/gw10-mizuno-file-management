@@ -14,12 +14,24 @@ All logic is config-driven. Code must not hardcode structure.
 
 ---
 
-## Phase 1 (MVP) — Filename Checks & Directory Printout (READ-ONLY)
+## Phase 1 (MVP) — Filename Checks & Directory Printout (READ-ONLY) ✅ COMPLETE
 
 ### Objective
 Resolve a filename into a **numbered, human-readable Google Drive path** and print it.
 
 No external APIs. No Google Drive writes.
+
+### Status: COMPLETED
+- ✅ Config loading from JSON files
+- ✅ Pack detection via keyTokens
+- ✅ Model code detection
+- ✅ Rule matching with contains, extensions, codeRange, anyOf
+- ✅ Path resolution with placeholders
+- ✅ CLI interface
+- ✅ REST API (`/api/resolve`)
+- ✅ Directory structure generation (`/api/structure`)
+- ✅ React frontend with filename input, path output, error display
+- ✅ Config viewer for editing configuration files
 
 ---
 
@@ -244,12 +256,162 @@ Expected:
 
 ---
 
-## Phase 2 — Google Drive Directory Creation (Later)
-Add:
-- Google OAuth
-- Drive folder existence check
-- Create missing folders only (never rename/delete)
-- Dry-run toggle (preview vs create)
+## Phase 2 — Google Drive Directory Creation 🔄 IN PROGRESS
+
+### Objective
+Connect to Google Drive and create the resolved directory structure.
+
+### Phase 2 Scope (IN)
+- Google OAuth 2.0 authentication flow
+- Drive API integration for folder operations
+- Folder existence check before creation
+- Create missing folders (never rename/delete)
+- Dry-run toggle (preview mode vs actual creation)
+- Session management for authenticated users
+
+### Phase 2 Explicitly OUT of Scope
+- File uploads
+- File overwrite logic
+- QC workflows
+- Permissions management beyond basic auth
+
+---
+
+### Phase 2 Implementation Tasks
+
+| ID | Task | Status |
+|----|------|--------|
+| P2-01 | Set up Google Cloud Project with Drive API | ⬜ User Setup Required |
+| P2-02 | Implement OAuth 2.0 login flow (backend) | ✅ Complete |
+| P2-03 | Create `/api/auth/login` endpoint | ✅ Complete |
+| P2-04 | Create `/api/auth/callback` endpoint | ✅ Complete |
+| P2-05 | Create `/api/auth/logout` endpoint | ✅ Complete |
+| P2-06 | Implement Drive service wrapper | ✅ Complete |
+| P2-07 | Add folder existence check function | ✅ Complete |
+| P2-08 | Add folder creation function | ✅ Complete |
+| P2-09 | Create `/api/drive/check-structure` endpoint | ✅ Complete |
+| P2-10 | Create `/api/drive/create-directories` endpoint | ✅ Complete |
+| P2-11 | Add dry-run toggle to creation endpoint | ✅ Complete |
+| P2-12 | Update frontend with login button | ✅ Complete |
+| P2-13 | Add Drive status indicator to UI | ✅ Complete |
+| P2-14 | Update DirectoryCreator to use real Drive API | ✅ Complete |
+
+---
+
+### Phase 2 API Endpoints
+
+#### Authentication
+- `GET /api/auth/login` — Redirect to Google OAuth consent screen
+- `GET /api/auth/callback` — Handle OAuth callback, store tokens
+- `GET /api/auth/logout` — Clear session/tokens
+- `GET /api/auth/status` — Check if user is authenticated
+
+#### Drive Operations
+- `POST /api/drive/check-structure` — Check which folders exist/missing
+- `POST /api/drive/create-directories` — Create missing folders (with dry_run option)
+
+---
+
+### Phase 2 Environment Variables Required
+
+#### Backend (.env)
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_JWT_SECRET=your-jwt-secret
+DRIVE_ROOT_FOLDER_ID=<ID of 26SS_FTW_Sell-in folder>
+DRIVE_ROOT_FOLDER=26SS_FTW_Sell-in
+FLASK_SECRET_KEY=change-this-to-random-secret
+```
+
+#### Frontend (.env)
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+---
+
+### Phase 2 Files Created/Modified
+
+#### Backend (Python)
+- `backend/src/auth.py` — Supabase JWT authentication module
+- `backend/src/drive_service.py` — Google Drive API wrapper
+- `backend/src/api.py` — Updated with auth and drive endpoints
+- `backend/requirements.txt` — Added Supabase and Google API dependencies
+- `backend/.env.example` — Environment variable template (Supabase config)
+
+#### Frontend (React)
+- `frontend/src/config/supabase.js` — Supabase client configuration
+- `frontend/src/components/AuthStatus.jsx` — Supabase login/logout component
+- `frontend/src/components/AuthStatus.css` — AuthStatus styling
+- `frontend/src/components/DirectoryCreator.jsx` — Updated with Drive mode
+- `frontend/src/components/DirectoryCreator.css` — Updated styling
+- `frontend/src/components/DirectoryViewer.jsx` — Updated to use DirectoryCreator
+- `frontend/src/config/api.js` — Added new API endpoints
+- `frontend/src/App.jsx` — Added AuthStatus and session management
+- `frontend/package.json` — Added @supabase/supabase-js dependency
+- `frontend/.env.example` — Frontend environment template
+
+---
+
+### Phase 2 Setup Instructions
+
+#### Supabase Setup
+
+1. **Enable Google Provider in Supabase**
+   - Go to your Supabase project dashboard
+   - Navigate to Authentication > Providers
+   - Enable Google provider
+   - Add your Google OAuth credentials (Client ID & Secret)
+
+2. **Configure Google Cloud for Supabase**
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create OAuth 2.0 credentials (Web application)
+   - Add authorized redirect URI: `https://your-project.supabase.co/auth/v1/callback`
+   - Enable Google Drive API in your Google Cloud project
+   - Add scopes: `drive.file`, `drive.metadata.readonly`
+
+3. **Get Supabase Credentials**
+   - Go to Supabase Project Settings > API
+   - Copy: Project URL, anon/public key, JWT Secret
+
+4. **Set Environment Variables**
+
+   Backend (`backend/.env`):
+   ```bash
+   cp backend/.env.example backend/.env
+   # Fill in Supabase credentials and Drive folder ID
+   ```
+
+   Frontend (`frontend/.env`):
+   ```bash
+   cp frontend/.env.example frontend/.env
+   # Fill in Supabase URL and anon key
+   ```
+
+5. **Install Dependencies**
+   ```bash
+   # Backend
+   cd backend && pip install -r requirements.txt
+
+   # Frontend
+   cd frontend && npm install
+   ```
+
+6. **Run the Application**
+   ```bash
+   # Backend
+   cd backend && python src/api.py
+
+   # Frontend
+   cd frontend && npm run dev
+   ```
+
+#### Important Notes
+- The Google provider token from Supabase is used for Drive API access
+- Tokens are passed via `Authorization` header (Supabase JWT) and `X-Google-Token` header (Google access token)
+- Provider tokens may expire; users may need to re-login for Drive access
 
 ---
 
