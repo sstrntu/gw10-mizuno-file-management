@@ -1,23 +1,47 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './DirectoryViewer.css'
+import { API_ENDPOINTS } from '../config/api'
 import DirectoryCreator from './DirectoryCreator'
 
 // Default folder ID from requirements
 const DEFAULT_ROOT_ID = '1cKccx5IF91I6kZrqBdSx8MPNirXAf2c5'
 
 function DirectoryViewer({ session }) {
-    const [structure, setStructure] = useState(null)
+    const [driveStructure, setDriveStructure] = useState(null)
+    const [configStructure, setConfigStructure] = useState(null)
     const [loading, setLoading] = useState(false)
     const [expandedNodes, setExpandedNodes] = useState(new Set())
     const [rootFolderId, setRootFolderId] = useState(DEFAULT_ROOT_ID)
     const [hasScanned, setHasScanned] = useState(false)
+    const [viewMode, setViewMode] = useState('drive') // 'drive' or 'config'
+
+    // Fetch config structure on mount
+    useEffect(() => {
+        fetchConfigStructure()
+    }, [])
+
+    const fetchConfigStructure = async () => {
+        try {
+            const response = await fetch(API_ENDPOINTS.STRUCTURE)
+            const data = await response.json()
+            if (response.ok) {
+                setConfigStructure(data)
+            }
+        } catch (err) {
+            console.error('Failed to fetch config structure:', err)
+        }
+    }
+
+    // Get current structure based on view mode
+    const structure = viewMode === 'drive' ? driveStructure : configStructure
 
     // Called when scan completes with hierarchy data
     const handleScanComplete = (hierarchy) => {
         if (hierarchy) {
-            setStructure(hierarchy)
+            setDriveStructure(hierarchy)
             setExpandedNodes(new Set([hierarchy.name]))
             setHasScanned(true)
+            setViewMode('drive') // Switch to drive view when scan completes
         }
     }
 
@@ -86,7 +110,28 @@ function DirectoryViewer({ session }) {
 
             <div className="viewer-header">
                 <h2>Directory Structure</h2>
-                <p className="subtitle">Live view from Google Drive</p>
+                <p className="subtitle">
+                    {viewMode === 'drive' ? 'Live view from Google Drive' : 'Expected structure from configuration'}
+                </p>
+                <div className="view-mode-toggle">
+                    <button
+                        className={`toggle-btn ${viewMode === 'drive' ? 'active' : ''}`}
+                        onClick={() => setViewMode('drive')}
+                    >
+                        Live Drive View
+                    </button>
+                    <button
+                        className={`toggle-btn ${viewMode === 'config' ? 'active' : ''}`}
+                        onClick={() => {
+                            setViewMode('config')
+                            if (configStructure) {
+                                setExpandedNodes(new Set([configStructure.name]))
+                            }
+                        }}
+                    >
+                        Config View
+                    </button>
+                </div>
             </div>
 
             <div className="tree-container">
@@ -97,13 +142,15 @@ function DirectoryViewer({ session }) {
                     </div>
                 )}
 
-                {!loading && !hasScanned && (
+                {!loading && viewMode === 'drive' && !hasScanned && (
                     <div className="empty-state">
                         <p>Click "Scan / Check Status" to view the directory structure from Google Drive.</p>
                     </div>
                 )}
 
-                {!loading && hasScanned && structure && renderNode(structure)}
+                {!loading && viewMode === 'drive' && hasScanned && structure && renderNode(structure)}
+
+                {!loading && viewMode === 'config' && structure && renderNode(structure)}
             </div>
 
             <div className="viewer-info">
