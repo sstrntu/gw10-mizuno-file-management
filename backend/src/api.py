@@ -681,7 +681,11 @@ def drive_upload_file():
             }), 400
 
         # 6. Ensure path exists and get final folder ID
-        path_parts = result.path.full_path.split('/')
+        # The full_path includes the root folder name, but ensure_path_exists expects relative path
+        all_path_parts = result.path.full_path.split('/')
+        # Skip the first part (root folder name) since ensure_path_exists is relative to root_folder_id
+        path_parts = all_path_parts[1:] if len(all_path_parts) > 1 else []
+
         existing, created = drive.ensure_path_exists(path_parts, root_folder_id, dry_run=False)
 
         # Get the last folder ID (destination for file)
