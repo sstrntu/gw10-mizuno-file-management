@@ -187,9 +187,27 @@ function FileUploadTester() {
     }
 
     const handleFilesSelected = async (files) => {
-        // Create file state objects
+        // Check authentication first
+        if (!session) {
+            alert('Please log in with Google before uploading files.')
+            return
+        }
+
+        if (!session.provider_token) {
+            alert('Google authentication token not available. Please log in again.')
+            return
+        }
+
+        // Create file state objects with simple UUID fallback
+        const generateId = () => {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                return crypto.randomUUID()
+            }
+            return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }
+
         const newFileObjects = files.map(file => ({
-            id: crypto.randomUUID(),
+            id: generateId(),
             file: file,
             filename: file.name,
             size: file.size,
@@ -215,8 +233,10 @@ function FileUploadTester() {
                     body: JSON.stringify({ filename: fileObj.filename }),
                 })
                 const data = await response.json()
+                console.log(`Validation for ${fileObj.filename}:`, data)
                 return { id: fileObj.id, result: data }
             } catch (error) {
+                console.error(`Validation error for ${fileObj.filename}:`, error)
                 return {
                     id: fileObj.id,
                     result: {
@@ -229,6 +249,7 @@ function FileUploadTester() {
         })
 
         const validationResults = await Promise.all(validationPromises)
+        console.log('All validation results:', validationResults)
 
         // Update files with validation results
         setSelectedFiles(prev => {
@@ -270,6 +291,13 @@ function FileUploadTester() {
     }
 
     const uploadFile = (fileObj) => {
+        // Safety check for tokens
+        if (!session || !session.access_token || !session.provider_token) {
+            console.error('Session or tokens missing:', { session })
+            handleUploadError(fileObj, 'Authentication tokens not available. Please refresh and log in again.')
+            return
+        }
+
         const formData = new FormData()
         formData.append('file', fileObj.file)
         formData.append('filename', fileObj.filename)
@@ -279,38 +307,55 @@ function FileUploadTester() {
 
         const xhr = new XMLHttpRequest()
 
+        // Track progress
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
                 const progress = Math.round((e.loaded / e.total) * 100)
+                console.log(`${fileObj.filename} upload progress: ${progress}%`)
                 setUploadingFiles(prev => ({...prev, [fileObj.id]: progress}))
             }
         })
 
+        // Handle completion
         xhr.addEventListener('load', () => {
+            console.log(`${fileObj.filename} upload completed with status: ${xhr.status}`)
             if (xhr.status === 200) {
                 try {
                     const response = JSON.parse(xhr.responseText)
+                    console.log(`${fileObj.filename} success response:`, response)
                     handleUploadSuccess(fileObj, response)
                 } catch (e) {
+                    console.error(`${fileObj.filename} response parse error:`, e)
                     handleUploadError(fileObj, 'Invalid response format')
                 }
             } else {
                 try {
                     const error = JSON.parse(xhr.responseText)
-                    handleUploadError(fileObj, error.error || 'Upload failed')
+                    console.error(`${fileObj.filename} error response:`, error)
+                    handleUploadError(fileObj, error.error || `Upload failed (${xhr.status})`)
                 } catch (e) {
-                    handleUploadError(fileObj, 'Upload failed')
+                    console.error(`${fileObj.filename} error parse failed:`, e, 'Response:', xhr.responseText)
+                    handleUploadError(fileObj, `Upload failed (${xhr.status})`)
                 }
             }
         })
 
+        // Handle errors
         xhr.addEventListener('error', () => {
+            console.error(`${fileObj.filename} network error`)
             handleUploadError(fileObj, 'Network error during upload')
         })
 
+        xhr.addEventListener('abort', () => {
+            console.error(`${fileObj.filename} upload aborted`)
+            handleUploadError(fileObj, 'Upload was aborted')
+        })
+
+        // Start upload
+        console.log(`Starting upload for ${fileObj.filename} to ${API_ENDPOINTS.DRIVE_UPLOAD}`)
         xhr.open('POST', API_ENDPOINTS.DRIVE_UPLOAD)
-        xhr.setRequestHeader('Authorization', `Bearer ${session?.access_token}`)
-        xhr.setRequestHeader('X-Google-Token', session?.provider_token)
+        xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`)
+        xhr.setRequestHeader('X-Google-Token', session.provider_token)
         xhr.send(formData)
 
         // Update file status
