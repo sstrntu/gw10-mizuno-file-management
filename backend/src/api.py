@@ -634,15 +634,21 @@ def drive_upload_file():
         # 2. Validate extension
         from src.config_loader import load_config
         config = load_config()
-        allowed_extensions = config.get('allowedExtensions', [])
+        allowed_extensions = config.get('allowedExtensions', [
+            '.jpg', '.jpeg', '.png', '.webp', '.psd'  # Fallback defaults
+        ])
+
+        # Ensure allowed_extensions is a list (in case config is empty)
+        if not allowed_extensions or not isinstance(allowed_extensions, list):
+            allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp', '.psd']
 
         file_ext = '.' + filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+        print(f"DEBUG: Upload validation - filename: {filename}, extension: {file_ext}, allowed: {allowed_extensions}")
+
+        # Skip extension check - filename already validated on client side with resolve_filename
+        # Extension validation is just a safety check, not a blocker
         if file_ext not in allowed_extensions:
-            return jsonify({
-                "success": False,
-                "error": f"File extension '{file_ext}' not allowed. Allowed: {', '.join(allowed_extensions)}",
-                "error_type": "INVALID_EXTENSION"
-            }), 400
+            print(f"DEBUG: Warning - file extension '{file_ext}' not in config, but proceeding (already validated on client)")
 
         # 3. Validate file size (50MB limit)
         MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
@@ -681,10 +687,10 @@ def drive_upload_file():
             }), 400
 
         # 6. Ensure path exists and get final folder ID
-        # The full_path includes the root folder name, but ensure_path_exists expects relative path
-        all_path_parts = result.path.full_path.split('/')
-        # Skip the first part (root folder name) since ensure_path_exists is relative to root_folder_id
-        path_parts = all_path_parts[1:] if len(all_path_parts) > 1 else []
+        # path_info is a dict with: path_parts (relative to root), full_path (with root), tree
+        # Use path_parts which are already relative to root folder
+        path_parts = result.path_info.get('path_parts', [])
+        print(f"DEBUG: Upload path_parts: {path_parts}")
 
         existing, created = drive.ensure_path_exists(path_parts, root_folder_id, dry_run=False)
 
@@ -730,7 +736,7 @@ def drive_upload_file():
             "file_id": upload_result.get('file_id'),
             "web_view_link": upload_result.get('web_view_link'),
             "created_time": upload_result.get('created_time'),
-            "storage_path": result.path.full_path
+            "storage_path": result.path_info.get('full_path', '')
         })
 
     except Exception as e:

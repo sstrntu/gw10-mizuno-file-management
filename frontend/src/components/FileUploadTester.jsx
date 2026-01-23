@@ -272,22 +272,29 @@ function FileUploadTester() {
         const validFiles = newFileObjects.filter(f => {
             const validation = validationResults.find(v => v.id === f.id)
             return validation?.result.success
-        })
+        }).map(f => ({
+            ...f,
+            status: 'valid'  // Mark as valid for the upload useEffect
+        }))
 
         const invalidFiles = newFileObjects.filter(f => {
             const validation = validationResults.find(v => v.id === f.id)
             return !validation?.result.success
         })
 
+        console.log(`Adding ${validFiles.length} valid files to upload queue`)
         setUploadQueue(prev => [...prev, ...validFiles])
 
-        setFailedFiles(prev => [...prev, ...invalidFiles.map(f => {
-            const validation = validationResults.find(v => v.id === f.id)
-            return {
-                ...f,
-                error: validation?.result.error || 'Validation failed'
-            }
-        })])
+        if (invalidFiles.length > 0) {
+            console.log(`Adding ${invalidFiles.length} invalid files to failed`)
+            setFailedFiles(prev => [...prev, ...invalidFiles.map(f => {
+                const validation = validationResults.find(v => v.id === f.id)
+                return {
+                    ...f,
+                    error: validation?.result.error || 'Validation failed'
+                }
+            })])
+        }
     }
 
     const uploadFile = (fileObj) => {
@@ -411,6 +418,12 @@ function FileUploadTester() {
         }
 
         setUploadQueue(prev => [...prev, updatedFile])
+    }
+
+    const uploadNewFile = () => {
+        // Clear all failed files and let user select new ones
+        setFailedFiles([])
+        fileInputRef.current?.click()
     }
 
     const clearAll = () => {
@@ -816,13 +829,21 @@ function FileUploadTester() {
                                                     </div>
                                                     <div className="file-error">
                                                         <p className="error-msg">{file.error}</p>
-                                                        <button
-                                                            className="retry-btn"
-                                                            onClick={() => retryUpload(file)}
-                                                            disabled={file.retryCount >= 3}
-                                                        >
-                                                            {file.retryCount >= 3 ? `Max Retries (${file.retryCount})` : 'Retry'}
-                                                        </button>
+                                                        <div className="error-actions">
+                                                            <button
+                                                                className="retry-btn"
+                                                                onClick={() => retryUpload(file)}
+                                                                disabled={file.retryCount >= 3}
+                                                            >
+                                                                {file.retryCount >= 3 ? `Max Retries (${file.retryCount})` : 'Retry'}
+                                                            </button>
+                                                            <button
+                                                                className="upload-new-btn"
+                                                                onClick={uploadNewFile}
+                                                            >
+                                                                Upload New File
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))}
