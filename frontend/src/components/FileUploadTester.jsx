@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../hooks/useAuth'
 import './FileUploadTester.css'
 import { API_ENDPOINTS } from '../config/api'
 
