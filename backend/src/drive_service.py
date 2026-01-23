@@ -107,7 +107,7 @@ class DriveService:
 
     def create_folder(self, name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """
-        Create a new folder.
+        Create a new folder with retry logic for transient errors.
 
         Args:
             name: Folder name
@@ -116,26 +116,42 @@ class DriveService:
         Returns:
             New folder ID or None if creation failed
         """
-        try:
-            file_metadata = {
-                'name': name,
-                'mimeType': self.FOLDER_MIME_TYPE
-            }
+        import time
+        max_retries = 3
+        retry_delay = 1
 
-            if parent_id:
-                file_metadata['parents'] = [parent_id]
+        for attempt in range(max_retries):
+            try:
+                file_metadata = {
+                    'name': name,
+                    'mimeType': self.FOLDER_MIME_TYPE
+                }
 
-            folder = self.service.files().create(
-                body=file_metadata,
-                fields='id',
-                supportsAllDrives=True
-            ).execute()
+                if parent_id:
+                    file_metadata['parents'] = [parent_id]
 
-            return folder.get('id')
+                folder = self.service.files().create(
+                    body=file_metadata,
+                    fields='id',
+                    supportsAllDrives=True
+                ).execute()
 
-        except HttpError as e:
-            print(f"Error creating folder '{name}': {e}")
-            return None
+                return folder.get('id')
+
+            except HttpError as e:
+                # Check if error is retryable (5xx errors)
+                if e.resp.status >= 500 and attempt < max_retries - 1:
+                    print(f"Transient error creating folder '{name}' (attempt {attempt + 1}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"Error creating folder '{name}': {e}")
+                    return None
+            except Exception as e:
+                print(f"Unexpected error creating folder '{name}': {e}")
+                return None
+
+        return None
 
     def get_or_create_folder(self, name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """
@@ -294,7 +310,10 @@ class DriveService:
                 })
 
         # Build hierarchy from the already-fetched folders
-        hierarchy = self._build_tree_from_flat(root_info, all_folders, max_depth=10)
+        full_hierarchy = self._build_tree_from_flat(root_info, all_folders, max_depth=10)
+
+        # Return full hierarchy (includes root folder and all children)
+        hierarchy = full_hierarchy
 
         return {
             'existing': existing_paths,
@@ -463,7 +482,9 @@ class DriveService:
                         deleted += 1
                         print(f"Deleted: {item['name']} ({item['id']})")
                     except Exception as e:
-                        print(f"Failed to delete {item['name']}: {e}")
+                        # Skip 404 errors (folder already deleted), only count actual failures
+                        if '404' not in str(e):
+                            print(f"Failed to delete {item['name']}: {e}")
                         failed += 1
 
                 page_token = results.get('nextPageToken')

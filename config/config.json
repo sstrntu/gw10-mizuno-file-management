@@ -1,7 +1,7 @@
 {
-    "version": "1.0",
+    "version": "2.0",
     "drive": {
-        "rootFolder": "26SS_FTW_Sell-in"
+        "rootFolder": "27SS_FTW_Sell-in"
     },
     "includes": {
         "packs": "./packs.json",

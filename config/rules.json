@@ -100,35 +100,6 @@
                 "{SUPPORTING}",
                 "{MODEL_FOLDER}"
             ]
-        },
-        {
-            "id": "carousel",
-            "description": "Carousel files: .png or .psd, C01–C09 optional, no model code needed",
-            "match": {
-                "extensions": [
-                    ".png",
-                    ".psd"
-                ],
-                "anyOf": [
-                    {
-                        "contains": [
-                            "_CAROUSEL"
-                        ]
-                    },
-                    {
-                        "codeRange": {
-                            "prefix": "C",
-                            "min": 1,
-                            "max": 9,
-                            "pad": 2
-                        }
-                    }
-                ]
-            },
-            "pathTemplate": [
-                "{PACK_FOLDER}",
-                "{CAROUSEL}"
-            ]
         }
     ]
 }

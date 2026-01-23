@@ -2,8 +2,7 @@
     "categories": {
         "keyVisual": "1. Key Visual",
         "techShots": "2. Tech Shots",
-        "supporting": "3. Supporting Images",
-        "carousel": "4. Carousel"
+        "supporting": "3. Supporting Images"
     },
     "kvSubfolders": {
         "colorPack": "1. Color Pack",

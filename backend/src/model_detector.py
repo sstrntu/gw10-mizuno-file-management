@@ -19,29 +19,33 @@ class ModelDetector:
     def detect(self, filename: str) -> Optional[Dict[str, Any]]:
         """
         Detect model code in the filename.
-        
+
         Model codes are matched anywhere in the filename (substring match).
-        If multiple model codes are found, the first match (by order in config) is returned.
-        
+        Longer/more specific codes are checked first to avoid substring conflicts
+        (e.g., A3E_HI before A3E).
+
         Args:
             filename: The filename to analyze
-        
+
         Returns:
             Dict containing model information (code, folder) or None if no model found
         """
         filename_upper = filename.upper()
-        
-        for model in self.models:
+
+        # Sort models by code length (descending) to check longer/more specific codes first
+        sorted_models = sorted(self.models, key=lambda m: len(m.get("code", "")), reverse=True)
+
+        for model in sorted_models:
             code = model.get("code", "")
             code_upper = code.upper()
-            
+
             # Check if model code appears anywhere in filename
             if code_upper in filename_upper:
                 return {
                     "code": code,
                     "folder": model.get("folder", "")
                 }
-        
+
         return None
 
 

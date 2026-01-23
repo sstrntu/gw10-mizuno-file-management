@@ -145,23 +145,27 @@ class DirectoryStructureGenerator:
     def generate_flat_paths(self) -> List[str]:
         """
         Generate flat list of all directory paths.
-        
+        Excludes the root folder itself, only returns paths for its children.
+
         Returns:
-            List of full directory paths
+            List of full directory paths (relative to root folder)
         """
         paths = []
         structure = self.generate_structure()
-        
+
         def traverse(node: Dict[str, Any], current_path: str = ""):
             path = f"{current_path}/{node['name']}" if current_path else node['name']
-            
+
             if node.get("type") == "directory":
                 paths.append(path)
-            
+
             for child in node.get("children", []):
                 traverse(child, path)
-        
-        traverse(structure)
+
+        # Traverse from root's children, skipping the root folder itself
+        for child in structure.get("children", []):
+            traverse(child, "")
+
         return paths
 
 

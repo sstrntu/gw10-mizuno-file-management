@@ -1,47 +1,24 @@
 {
     "packs": [
         {
-            "id": "bright_gold",
+            "id": "elite",
             "order": 1,
-            "folder": "1. Bright Gold Pack",
-            "keyTokens": [
-                "26SS",
-                "FTW",
-                "Bright",
-                "Gold"
-            ]
+            "folder": "1. ELITE"
         },
         {
-            "id": "stargazer",
+            "id": "vibrunt_rush",
             "order": 2,
-            "folder": "2. Stargazer Pack",
-            "keyTokens": [
-                "26SS",
-                "FTW",
-                "Stargazer"
-            ]
+            "folder": "2. VIBRUNT RUSH"
         },
         {
-            "id": "unity_sky",
+            "id": "heart_beat",
             "order": 3,
-            "folder": "3. Unity Sky Pack",
-            "keyTokens": [
-                "26SS",
-                "FTW",
-                "Unity",
-                "Sky"
-            ]
+            "folder": "3. HEART BEAT"
         },
         {
-            "id": "blazing_flair",
+            "id": "ltd",
             "order": 4,
-            "folder": "4. Blazing Flair Pack",
-            "keyTokens": [
-                "26SS",
-                "FTW",
-                "Blazing",
-                "Flair"
-            ]
+            "folder": "4. LTD"
         }
     ]
 }

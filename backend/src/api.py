@@ -451,16 +451,8 @@ def drive_check_structure():
         if not paths:
             from src.directory_generator import generate_flat_paths
             path_strings = generate_flat_paths()
-            # Convert string paths to list of parts (skip root folder)
-            root_name = os.environ.get('DRIVE_ROOT_FOLDER', '26SS_FTW_Sell-in')
-            paths = []
-            for p in path_strings:
-                parts = p.split('/')
-                # Skip the root folder name if present
-                if parts and parts[0] == root_name:
-                    parts = parts[1:]
-                if parts:
-                    paths.append(parts)
+            # Convert string paths to list of parts
+            paths = [p.split('/') for p in path_strings]
 
         result = drive.check_structure(paths, root_folder_id)
         result['success'] = True
@@ -533,16 +525,8 @@ def drive_create_directories():
         if not paths:
             from src.directory_generator import generate_flat_paths
             path_strings = generate_flat_paths()
-            # Convert string paths to list of parts (skip root folder)
-            root_name = os.environ.get('DRIVE_ROOT_FOLDER', '26SS_FTW_Sell-in')
-            paths = []
-            for p in path_strings:
-                parts = p.split('/')
-                # Skip the root folder name if present
-                if parts and parts[0] == root_name:
-                    parts = parts[1:]
-                if parts:
-                    paths.append(parts)
+            # Convert string paths to list of parts
+            paths = [p.split('/') for p in path_strings]
 
         result = drive.create_structure(paths, root_folder_id, dry_run=dry_run)
         result['success'] = True
@@ -654,16 +638,8 @@ def drive_reset_structure():
         if not paths:
             from src.directory_generator import generate_flat_paths
             path_strings = generate_flat_paths()
-            # Convert string paths to list of parts (skip root folder)
-            root_name = os.environ.get('DRIVE_ROOT_FOLDER', '26SS_FTW_Sell-in')
-            paths = []
-            for p in path_strings:
-                parts = p.split('/')
-                # Skip the root folder name if present
-                if parts and parts[0] == root_name:
-                    parts = parts[1:]
-                if parts:
-                    paths.append(parts)
+            # Convert string paths to list of parts
+            paths = [p.split('/') for p in path_strings]
 
         create_result = drive.create_structure(paths, root_folder_id, dry_run=False)
         create_result['success'] = True

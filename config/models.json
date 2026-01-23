@@ -2,43 +2,87 @@
     "models": [
         {
             "code": "N5BJ",
-            "folder": "1. MORELIA NEO V β Japan"
+            "folder": "MORELIA NEO V β JAPAN"
         },
         {
             "code": "N5RJ",
-            "folder": "2. MORELIA NEO V JAPAN"
-        },
-        {
-            "code": "A3J",
-            "folder": "3. MIZUNO ALPHA III"
+            "folder": "MORELIA NEO V JAPAN"
         },
         {
             "code": "M2J",
-            "folder": "4. MORELIA Ⅱ Japan"
-        },
-        {
-            "code": "CN3J",
-            "folder": "5. MONARCIDA NEO III JAPAN"
-        },
-        {
-            "code": "C3JW",
-            "folder": "6. MONARCIDA NEO III WIDE JAPAN"
+            "folder": "MORELIA II JAPAN"
         },
         {
             "code": "NSBJ_IN",
-            "folder": "7. MORELIA NEO SALA β JAPAN IN"
+            "folder": "MORELIA NEO SALA β JAPAN IN"
         },
         {
             "code": "NSBJ_TF",
-            "folder": "8. MORELIA NEO SALA β JAPAN TF"
+            "folder": "MORELIA NEO SALA β JAPAN TF"
         },
         {
             "code": "MRSJ_IN",
-            "folder": "9. MORELIA SALA JAPAN IN"
+            "folder": "MORELIA SALA JAPAN IN"
         },
         {
             "code": "MRSJ_TF",
-            "folder": "10. MORELIA SALA JAPAN TF"
+            "folder": "MORELIA SALA JAPAN TF"
+        },
+        {
+            "code": "A3J",
+            "folder": "MIZUNO ALPHA III"
+        },
+        {
+            "code": "M2J_LTD",
+            "folder": "MORELIA II JAPAN Ltd."
+        },
+        {
+            "code": "N5BE",
+            "folder": "MORELIA NEO V β ELITE"
+        },
+        {
+            "code": "N5RE",
+            "folder": "MORELIA NEO V ELITE"
+        },
+        {
+            "code": "M2E",
+            "folder": "MORELIA II ELITE"
+        },
+        {
+            "code": "CN4E",
+            "folder": "MONARCIDA NEO IV ELITE"
+        },
+        {
+            "code": "CN4WE",
+            "folder": "MONARCIDA NEO IV WIDE ELITE"
+        },
+        {
+            "code": "NSBE_IN",
+            "folder": "MORELIA NEO SALA β ELITE IN"
+        },
+        {
+            "code": "NSBE_TF",
+            "folder": "MORELIA NEO SALA β ELITE TF"
+        },
+        {
+            "code": "MRSE_N",
+            "folder": "MORELIA SALA ELITE IN"
+        },
+        {
+            "code": "MRSE_TF",
+            "folder": "MORELIA SALA ELITE TF"
+        },
+        {
+            "code": "A3E",
+            "folder": "MIZUNO α III ELITE"
+        },
+        {
+            "code": "N5BE_SYN",
+            "folder": "MORELIA NEO V β ELITE HIGH Synthetic"
+        },
+        {
+            "code": "A3E_HI",
+            "folder": "MIZUNO α III ELITE HIGH"
         }
     ]
 }
