@@ -31,4 +31,5 @@ export const API_ENDPOINTS = {
   DRIVE_CHECK_STRUCTURE: `${API_BASE_URL}/api/drive/check-structure`,
   DRIVE_CREATE_DIRECTORIES: `${API_BASE_URL}/api/drive/create-directories`,
   DRIVE_RESET_STRUCTURE: `${API_BASE_URL}/api/drive/reset-structure`,
+  DRIVE_UPLOAD: `${API_BASE_URL}/api/drive/upload`,
 };

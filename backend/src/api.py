@@ -572,6 +572,171 @@ def drive_get_folder(folder_id):
         }), 500
 
 
+@app.route('/api/drive/upload', methods=['POST'])
+@require_auth
+def drive_upload_file():
+    """
+    Upload file to Google Drive at resolved path.
+
+    Request: multipart/form-data
+    - file: File object
+    - filename: Original filename (required)
+    - root_folder_id: (optional) Override root folder
+
+    Headers:
+    - X-Google-Token: Google OAuth token
+    - Authorization: Bearer <supabase_token>
+
+    Response JSON:
+        {
+            "success": true,
+            "filename": "original_filename.jpg",
+            "actual_filename": "original_filename.jpg or original_filename_1.jpg",
+            "file_id": "...",
+            "web_view_link": "...",
+            "created_time": "...",
+            "storage_path": "Pack/KeyVisual/..."
+        }
+
+    Error responses:
+    - INVALID_FILE: No file provided
+    - INVALID_EXTENSION: Extension not in allowedExtensions
+    - FILE_TOO_LARGE: Exceeds 50MB
+    - VALIDATION_FAILED: Filename doesn't match rules
+    - UPLOAD_FAILED: Drive API error
+    """
+    try:
+        # 1. Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No file provided in request",
+                "error_type": "INVALID_FILE"
+            }), 400
+
+        file = request.files['file']
+        filename = request.form.get('filename')
+
+        if not filename:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'filename' in form data",
+                "error_type": "INVALID_FILE"
+            }), 400
+
+        if file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "Empty file provided",
+                "error_type": "INVALID_FILE"
+            }), 400
+
+        # 2. Validate extension
+        from src.config_loader import load_config
+        config = load_config()
+        allowed_extensions = config.get('allowedExtensions', [])
+
+        file_ext = '.' + filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+        if file_ext not in allowed_extensions:
+            return jsonify({
+                "success": False,
+                "error": f"File extension '{file_ext}' not allowed. Allowed: {', '.join(allowed_extensions)}",
+                "error_type": "INVALID_EXTENSION"
+            }), 400
+
+        # 3. Validate file size (50MB limit)
+        MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
+        file_content = file.read()
+        if len(file_content) > MAX_FILE_SIZE:
+            return jsonify({
+                "success": False,
+                "error": f"File size exceeds 50MB limit ({len(file_content) / 1024 / 1024:.1f}MB)",
+                "error_type": "FILE_TOO_LARGE"
+            }), 400
+
+        # 4. Validate filename using resolver
+        result = resolve_filename(filename)
+        if not result.success:
+            return jsonify({
+                "success": False,
+                "error": result.error,
+                "error_type": "VALIDATION_FAILED"
+            }), 400
+
+        # 5. Get Google Drive service
+        drive, error = get_drive_service_from_request()
+        if not drive:
+            return jsonify({
+                "success": False,
+                "error": error,
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        root_folder_id = request.form.get('root_folder_id') or os.environ.get('DRIVE_ROOT_FOLDER_ID')
+        if not root_folder_id:
+            return jsonify({
+                "success": False,
+                "error": "No root folder ID provided",
+                "error_type": "CONFIG_ERROR"
+            }), 400
+
+        # 6. Ensure path exists and get final folder ID
+        path_parts = result.path.full_path.split('/')
+        existing, created = drive.ensure_path_exists(path_parts, root_folder_id, dry_run=False)
+
+        # Get the last folder ID (destination for file)
+        if created:
+            final_folder_id = created[-1]['id']
+        elif existing:
+            final_folder_id = existing[-1]['id']
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to create or locate destination folder",
+                "error_type": "UPLOAD_FAILED"
+            }), 500
+
+        if not final_folder_id:
+            return jsonify({
+                "success": False,
+                "error": "Destination folder path could not be resolved",
+                "error_type": "UPLOAD_FAILED"
+            }), 500
+
+        # 7. Upload file
+        upload_result = drive.upload_file(
+            file_content,
+            filename,
+            final_folder_id,
+            mime_type=file.content_type
+        )
+
+        if not upload_result['success']:
+            return jsonify({
+                "success": False,
+                "error": upload_result.get('error', 'Upload failed'),
+                "error_type": upload_result.get('error_type', 'UPLOAD_FAILED')
+            }), 500
+
+        # 8. Return success response
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "actual_filename": upload_result.get('filename'),
+            "file_id": upload_result.get('file_id'),
+            "web_view_link": upload_result.get('web_view_link'),
+            "created_time": upload_result.get('created_time'),
+            "storage_path": result.path.full_path
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Server error: {str(e)}",
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
 @app.route('/api/drive/reset-structure', methods=['POST'])
 @require_auth
 def drive_reset_structure():

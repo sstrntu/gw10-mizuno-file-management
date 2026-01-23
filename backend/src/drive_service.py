@@ -4,9 +4,12 @@ Handles all Google Drive API interactions for folder operations.
 """
 
 import os
-from typing import Optional, Dict, List, Tuple
+import mimetypes
+from io import BytesIO
+from typing import Optional, Dict, List, Tuple, Any
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseUpload
 from google.oauth2.credentials import Credentials
 
 
@@ -504,6 +507,186 @@ class DriveService:
                 'deleted_count': deleted,
                 'failed_count': failed
             }
+
+    def file_exists(self, filename: str, folder_id: str) -> bool:
+        """
+        Check if file exists in a specific folder.
+
+        Args:
+            filename: File name to check
+            folder_id: Parent folder ID
+
+        Returns:
+            True if file exists in folder, False otherwise
+        """
+        try:
+            query = f"name = '{filename}' and '{folder_id}' in parents and trashed = false"
+            results = self.service.files().list(
+                q=query,
+                spaces='drive',
+                fields='files(id)',
+                pageSize=1,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
+
+            files = results.get('files', [])
+            return len(files) > 0
+
+        except HttpError as e:
+            print(f"Error checking if file exists: {e}")
+            return False
+
+    def get_unique_filename(self, filename: str, folder_id: str) -> str:
+        """
+        Generate unique filename by appending numeric suffix if needed.
+
+        Args:
+            filename: Original filename
+            folder_id: Parent folder ID
+
+        Returns:
+            Unique filename (appends _1, _2, etc. if file exists)
+        """
+        if not self.file_exists(filename, folder_id):
+            return filename
+
+        # Split filename into name and extension
+        name_parts = filename.rsplit('.', 1)
+        if len(name_parts) == 2:
+            base_name, ext = name_parts
+            ext = '.' + ext
+        else:
+            base_name = filename
+            ext = ''
+
+        # Try numbered variants
+        counter = 1
+        while counter <= 100:  # Limit attempts to prevent infinite loop
+            new_filename = f"{base_name}_{counter}{ext}"
+            if not self.file_exists(new_filename, folder_id):
+                return new_filename
+            counter += 1
+
+        # Fallback (shouldn't reach here in normal usage)
+        return f"{base_name}_DUPLICATE_{counter}{ext}"
+
+    def upload_file(
+        self,
+        file_content: bytes,
+        filename: str,
+        folder_id: str,
+        mime_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Upload file to Google Drive with retry logic and conflict resolution.
+
+        Args:
+            file_content: File content as bytes
+            filename: Original filename
+            folder_id: Destination folder ID
+            mime_type: MIME type (auto-detected if not provided)
+
+        Returns:
+            {
+                'success': bool,
+                'file_id': str (if success),
+                'filename': str (actual filename used, may differ if renamed),
+                'web_view_link': str (if success),
+                'created_time': str (if success),
+                'error': str (if failure),
+                'error_type': str
+            }
+        """
+        import time
+
+        # Auto-detect MIME type if not provided
+        if not mime_type:
+            mime_type, _ = mimetypes.guess_type(filename)
+            if not mime_type:
+                mime_type = 'application/octet-stream'
+
+        # Get unique filename if needed
+        unique_filename = self.get_unique_filename(filename, folder_id)
+
+        # Retry logic for transient errors
+        max_retries = 3
+        retry_delay = 1
+
+        for attempt in range(max_retries):
+            try:
+                file_metadata = {
+                    'name': unique_filename,
+                    'parents': [folder_id]
+                }
+
+                # Create file-like object from bytes
+                file_obj = BytesIO(file_content)
+
+                # Create media object for upload
+                media = MediaIoBaseUpload(file_obj, mimetype=mime_type, resumable=True)
+
+                # Upload file
+                file_result = self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, name, webViewLink, createdTime',
+                    supportsAllDrives=True
+                ).execute()
+
+                return {
+                    'success': True,
+                    'file_id': file_result.get('id'),
+                    'filename': unique_filename,
+                    'web_view_link': file_result.get('webViewLink'),
+                    'created_time': file_result.get('createdTime')
+                }
+
+            except HttpError as e:
+                # Check if error is retryable (5xx errors)
+                if e.resp.status >= 500 and attempt < max_retries - 1:
+                    print(f"Transient error uploading file (attempt {attempt + 1}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    # Determine error type
+                    if e.resp.status == 400:
+                        error_type = 'INVALID_FILE'
+                        error_msg = f"Invalid file: {str(e)}"
+                    elif e.resp.status == 403:
+                        error_type = 'PERMISSION_DENIED'
+                        error_msg = "Permission denied. Check folder access."
+                    elif e.resp.status == 404:
+                        error_type = 'FOLDER_NOT_FOUND'
+                        error_msg = "Destination folder not found."
+                    else:
+                        error_type = 'UPLOAD_FAILED'
+                        error_msg = f"Upload failed: {str(e)}"
+
+                    print(f"Error uploading file: {error_msg}")
+                    return {
+                        'success': False,
+                        'filename': filename,
+                        'error': error_msg,
+                        'error_type': error_type
+                    }
+
+            except Exception as e:
+                print(f"Unexpected error uploading file: {e}")
+                return {
+                    'success': False,
+                    'filename': filename,
+                    'error': f"Unexpected error: {str(e)}",
+                    'error_type': 'SERVER_ERROR'
+                }
+
+        # Max retries exceeded
+        return {
+            'success': False,
+            'filename': filename,
+            'error': 'Upload failed after maximum retries',
+            'error_type': 'MAX_RETRIES_EXCEEDED'
+        }
 
     def get_hierarchy(self, folder_id: str, max_depth: int = 10) -> Dict:
         """
