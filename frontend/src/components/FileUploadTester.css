@@ -811,6 +811,14 @@
     animation: pulse 1.5s ease-in-out infinite;
 }
 
+.stat-card.skipped {
+    border-color: var(--text-secondary);
+}
+
+.stat-card.skipped .stat-value {
+    color: var(--text-secondary);
+}
+
 /* Upload Section */
 .upload-section {
     padding: 2rem;
@@ -844,6 +852,16 @@
 .upload-section.error-section h4 {
     color: var(--error-color);
     text-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+}
+
+.upload-section.skipped-section {
+    border-color: var(--text-secondary);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, var(--bg-darker) 100%);
+}
+
+.upload-section.skipped-section h4 {
+    color: var(--text-secondary);
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
 }
 
 .file-list {
@@ -880,6 +898,11 @@
 .upload-file-item.failed {
     border-left: 4px solid var(--error-color);
     background: rgba(255, 0, 85, 0.03);
+}
+
+.upload-file-item.skipped {
+    border-left: 4px solid var(--text-secondary);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .upload-file-item:hover {

@@ -32,4 +32,11 @@ export const API_ENDPOINTS = {
   DRIVE_CREATE_DIRECTORIES: `${API_BASE_URL}/api/drive/create-directories`,
   DRIVE_RESET_STRUCTURE: `${API_BASE_URL}/api/drive/reset-structure`,
   DRIVE_UPLOAD: `${API_BASE_URL}/api/drive/upload`,
+  DRIVE_LIST_FILES: `${API_BASE_URL}/api/drive/list-files`,
+
+  // Phase 3 - QC Management
+  QC_FILES: `${API_BASE_URL}/api/qc/files`,
+  QC_APPROVE: `${API_BASE_URL}/api/qc/approve`,
+  QC_REJECT: `${API_BASE_URL}/api/qc/reject`,
+  QC_ACTIONS: `${API_BASE_URL}/api/qc/actions`,
 };

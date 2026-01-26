@@ -579,7 +579,8 @@ class DriveService:
         mime_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Upload file to Google Drive with retry logic and conflict resolution.
+        Upload file to Google Drive with retry logic.
+        Assumes file doesn't already exist (check via file_exists() first).
 
         Args:
             file_content: File content as bytes
@@ -591,7 +592,7 @@ class DriveService:
             {
                 'success': bool,
                 'file_id': str (if success),
-                'filename': str (actual filename used, may differ if renamed),
+                'filename': str (filename used),
                 'web_view_link': str (if success),
                 'created_time': str (if success),
                 'error': str (if failure),
@@ -606,8 +607,8 @@ class DriveService:
             if not mime_type:
                 mime_type = 'application/octet-stream'
 
-        # Get unique filename if needed
-        unique_filename = self.get_unique_filename(filename, folder_id)
+        # Use filename as-is (existence check is done before calling this method)
+        upload_filename = filename
 
         # Retry logic for transient errors
         max_retries = 3
@@ -616,7 +617,7 @@ class DriveService:
         for attempt in range(max_retries):
             try:
                 file_metadata = {
-                    'name': unique_filename,
+                    'name': upload_filename,
                     'parents': [folder_id]
                 }
 
@@ -637,7 +638,7 @@ class DriveService:
                 return {
                     'success': True,
                     'file_id': file_result.get('id'),
-                    'filename': unique_filename,
+                    'filename': upload_filename,
                     'web_view_link': file_result.get('webViewLink'),
                     'created_time': file_result.get('createdTime')
                 }

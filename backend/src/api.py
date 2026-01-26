@@ -541,6 +541,81 @@ def drive_create_directories():
         }), 500
 
 
+@app.route('/api/drive/list-files', methods=['GET'])
+@require_auth
+def drive_list_files():
+    """
+    List all files in Google Drive (non-folder items).
+
+    Query params:
+        root_folder_id: (optional) Limit to files within this folder and subfolders
+
+    Response JSON:
+        {
+            "success": true,
+            "files": [
+                {
+                    "id": "file_id",
+                    "name": "filename.jpg",
+                    "mimeType": "image/jpeg",
+                    "webViewLink": "https://drive.google.com/file/d/...",
+                    "createdTime": "2026-01-23T10:30:00Z",
+                    "modifiedTime": "2026-01-23T10:30:00Z"
+                }
+            ]
+        }
+    """
+    try:
+        drive, error = get_drive_service_from_request()
+        if not drive:
+            return jsonify({
+                "success": False,
+                "error": error,
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        root_folder_id = request.args.get('root_folder_id') or os.environ.get('DRIVE_ROOT_FOLDER_ID')
+
+        # If root_folder_id is provided, we'll list files in that folder and subfolders
+        # For simplicity, we'll list all non-folder files in Drive
+        query = "mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+
+        all_files = []
+        page_token = None
+
+        while True:
+            results = drive.service.files().list(
+                q=query,
+                spaces='drive',
+                fields='nextPageToken, files(id, name, mimeType, webViewLink, createdTime, modifiedTime)',
+                pageSize=1000,
+                pageToken=page_token,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                orderBy='createdTime desc'  # Most recent first
+            ).execute()
+
+            files = results.get('files', [])
+            all_files.extend(files)
+
+            page_token = results.get('nextPageToken')
+            if not page_token:
+                break
+
+        return jsonify({
+            "success": True,
+            "files": all_files,
+            "total": len(all_files)
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
 @app.route('/api/drive/folder/<folder_id>', methods=['GET'])
 @require_auth
 def drive_get_folder(folder_id):
@@ -713,6 +788,14 @@ def drive_upload_file():
                 "error_type": "UPLOAD_FAILED"
             }), 500
 
+        # 6b. Check if file already exists
+        if drive.file_exists(filename, final_folder_id):
+            return jsonify({
+                "success": False,
+                "error": f"File '{filename}' already exists in this folder",
+                "error_type": "FILE_EXISTS"
+            }), 409
+
         # 7. Upload file
         upload_result = drive.upload_file(
             file_content,
@@ -824,6 +907,321 @@ def drive_reset_structure():
         }
 
         return jsonify(create_result)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
+# =============================================================================
+# QC Management Endpoints
+# =============================================================================
+
+@app.route('/api/qc/files', methods=['GET'])
+@require_auth
+def qc_get_files():
+    """
+    Get all QC files with their approval status.
+    Fetches files from Google Drive and merges with QC data from Supabase.
+
+    Response JSON:
+        {
+            "success": true,
+            "files": [
+                {
+                    "id": "uuid",
+                    "file_id": "google_file_id",
+                    "filename": "file.jpg",
+                    "web_view_link": "https://drive.google.com/...",
+                    "mime_type": "image/jpeg",
+                    "status": "APPROVED",
+                    "approval_count": 3,
+                    "created_at": "2026-01-23T...",
+                    "updated_at": "2026-01-23T..."
+                }
+            ]
+        }
+    """
+    try:
+        from src.supabase_client import get_supabase_client
+
+        # Get all QC records from Supabase
+        supabase = get_supabase_client()
+        response = supabase.table('mz_27ss_upload_qc').select('*').execute()
+
+        qc_records = {record['file_id']: record for record in response.data}
+
+        # Get all files from Google Drive
+        drive, error = get_drive_service_from_request()
+        if not drive:
+            return jsonify({
+                "success": False,
+                "error": error,
+                "error_type": "DRIVE_ERROR"
+            }), 400
+
+        query = "mimeType != 'application/vnd.google-apps.folder' and trashed = false"
+        all_files = []
+        page_token = None
+
+        while True:
+            results = drive.service.files().list(
+                q=query,
+                spaces='drive',
+                fields='nextPageToken, files(id, name, mimeType, webViewLink, createdTime, modifiedTime)',
+                pageSize=1000,
+                pageToken=page_token,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                orderBy='createdTime desc'
+            ).execute()
+
+            files = results.get('files', [])
+
+            # Merge with QC data
+            for file in files:
+                qc_data = qc_records.get(file['id'], {})
+                file['qc'] = {
+                    'id': qc_data.get('id'),
+                    'status': qc_data.get('status', 'Pending'),
+                    'approval_count': qc_data.get('approval_count', 0),
+                    'created_at': qc_data.get('created_at'),
+                    'updated_at': qc_data.get('updated_at')
+                }
+
+            all_files.extend(files)
+            page_token = results.get('nextPageToken')
+            if not page_token:
+                break
+
+        return jsonify({
+            "success": True,
+            "files": all_files,
+            "total": len(all_files)
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
+@app.route('/api/qc/approve', methods=['POST'])
+@require_auth
+def qc_approve_file():
+    """
+    Approve a file and record the action with user info.
+
+    Request JSON:
+        {
+            "file_id": "google_file_id",
+            "filename": "file.jpg",
+            "web_view_link": "https://..."
+        }
+
+    Response: Updated QC record
+    """
+    try:
+        from src.supabase_client import get_supabase_client
+
+        data = request.get_json()
+        file_id = data.get('file_id')
+        filename = data.get('filename')
+        web_view_link = data.get('web_view_link')
+        mime_type = data.get('mime_type')
+
+        if not file_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing file_id"
+            }), 400
+
+        supabase = get_supabase_client()
+
+        # Get current user info from auth
+        user_id = auth.get_token_from_header()
+        user = auth.get_auth_status_from_token(user_id).get('user', {})
+        user_email = user.get('email', 'unknown@example.com')
+
+        # Check if QC record exists, if not create it
+        response = supabase.table('mz_27ss_upload_qc').select('*').eq('file_id', file_id).execute()
+
+        if not response.data:
+            # Create new QC record
+            qc_record = {
+                'file_id': file_id,
+                'filename': filename,
+                'web_view_link': web_view_link,
+                'mime_type': mime_type,
+                'status': 'Pending',
+                'approval_count': 0
+            }
+            supabase.table('mz_27ss_upload_qc').insert(qc_record).execute()
+            qc_id = supabase.table('mz_27ss_upload_qc').select('id').eq('file_id', file_id).execute().data[0]['id']
+        else:
+            qc_id = response.data[0]['id']
+
+        # Increment approval count
+        current = supabase.table('mz_27ss_upload_qc').select('approval_count').eq('id', qc_id).execute().data[0]
+        new_count = current['approval_count'] + 1
+        new_status = 'APPROVED' if new_count >= 3 else f'{new_count}/3 Approved'
+
+        # Update QC record
+        supabase.table('mz_27ss_upload_qc').update({
+            'approval_count': new_count,
+            'status': new_status
+        }).eq('id', qc_id).execute()
+
+        # Record action
+        supabase.table('mz_27ss_upload_qc_actions').insert({
+            'file_id': qc_id,
+            'action_type': 'approve',
+            'user_id': user_id,
+            'user_email': user_email
+        }).execute()
+
+        return jsonify({
+            "success": True,
+            "message": f"File approved by {user_email}",
+            "approval_count": new_count
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
+@app.route('/api/qc/reject', methods=['POST'])
+@require_auth
+def qc_reject_file():
+    """
+    Reject a file with a comment.
+
+    Request JSON:
+        {
+            "file_id": "google_file_id",
+            "filename": "file.jpg",
+            "web_view_link": "https://...",
+            "comment": "Reason for rejection"
+        }
+    """
+    try:
+        from src.supabase_client import get_supabase_client
+
+        data = request.get_json()
+        file_id = data.get('file_id')
+        filename = data.get('filename')
+        web_view_link = data.get('web_view_link')
+        comment = data.get('comment', '')
+
+        if not file_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing file_id"
+            }), 400
+
+        supabase = get_supabase_client()
+
+        # Get user info
+        user_id = auth.get_token_from_header()
+        user = auth.get_auth_status_from_token(user_id).get('user', {})
+        user_email = user.get('email', 'unknown@example.com')
+
+        # Check if QC record exists, if not create it
+        response = supabase.table('mz_27ss_upload_qc').select('*').eq('file_id', file_id).execute()
+
+        if not response.data:
+            qc_record = {
+                'file_id': file_id,
+                'filename': filename,
+                'web_view_link': web_view_link,
+                'status': 'Pending',
+                'approval_count': 0
+            }
+            supabase.table('mz_27ss_upload_qc').insert(qc_record).execute()
+            qc_id = supabase.table('mz_27ss_upload_qc').select('id').eq('file_id', file_id).execute().data[0]['id']
+        else:
+            qc_id = response.data[0]['id']
+
+        # Reset status to Pending
+        supabase.table('mz_27ss_upload_qc').update({
+            'status': 'Pending',
+            'approval_count': 0
+        }).eq('id', qc_id).execute()
+
+        # Record rejection action
+        supabase.table('mz_27ss_upload_qc_actions').insert({
+            'file_id': qc_id,
+            'action_type': 'reject',
+            'user_id': user_id,
+            'user_email': user_email,
+            'comment': comment
+        }).execute()
+
+        return jsonify({
+            "success": True,
+            "message": f"File rejected by {user_email}"
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "error_type": "SERVER_ERROR"
+        }), 500
+
+
+@app.route('/api/qc/actions/<file_id>', methods=['GET'])
+@require_auth
+def qc_get_actions(file_id):
+    """
+    Get all actions (approvals, rejections, comments) for a file.
+
+    Response JSON:
+        {
+            "success": true,
+            "actions": [
+                {
+                    "id": "uuid",
+                    "action_type": "approve",
+                    "user_email": "user@example.com",
+                    "comment": "...",
+                    "created_at": "2026-01-23T..."
+                }
+            ]
+        }
+    """
+    try:
+        from src.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+
+        # Get QC record ID from file_id
+        qc_response = supabase.table('mz_27ss_upload_qc').select('id').eq('file_id', file_id).execute()
+
+        if not qc_response.data:
+            return jsonify({
+                "success": True,
+                "actions": []
+            })
+
+        qc_id = qc_response.data[0]['id']
+
+        # Get all actions for this file
+        actions = supabase.table('mz_27ss_upload_qc_actions').select('*').eq('file_id', qc_id).order('created_at', desc=False).execute()
+
+        return jsonify({
+            "success": True,
+            "actions": actions.data
+        })
 
     except Exception as e:
         return jsonify({

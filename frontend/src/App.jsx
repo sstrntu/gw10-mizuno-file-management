@@ -10,7 +10,7 @@ import { useAuth } from './hooks/useAuth'
 
 function App() {
   const { user, session, loading, signOut } = useAuth()
-  const [activeTab, setActiveTab] = useState('structure')
+  const [activeTab, setActiveTab] = useState('upload')
   const [showConfig, setShowConfig] = useState(false)
 
   // Loading state
@@ -29,9 +29,9 @@ function App() {
 
   // Authenticated -> Show Main App
   const tabs = [
-    { id: 'structure', label: 'Directory Structure', icon: '>' },
-    { id: 'upload', label: 'File Upload Test', icon: '+' },
+    { id: 'upload', label: 'File Upload', icon: '+' },
     { id: 'qc', label: 'QC Matrix', icon: '#' },
+    { id: 'structure', label: 'Directory Structure', icon: '>' },
   ]
 
   return (
