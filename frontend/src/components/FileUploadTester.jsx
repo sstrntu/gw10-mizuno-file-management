@@ -21,7 +21,7 @@ function FileUploadTester() {
     const [uploadedFiles, setUploadedFiles] = useState([])
     const [failedFiles, setFailedFiles] = useState([])
     const [isDragging, setIsDragging] = useState(false)
-    const [uploadMode, setUploadMode] = useState(false)
+    const [uploadMode, setUploadMode] = useState(true)
 
     const fileInputRef = useRef(null)
 
@@ -333,16 +333,16 @@ function FileUploadTester() {
                     handleUploadSuccess(fileObj, response)
                 } catch (e) {
                     console.error(`${fileObj.filename} response parse error:`, e)
-                    handleUploadError(fileObj, 'Invalid response format')
+                    handleUploadError(fileObj, 'Invalid response format', 'PARSE_ERROR')
                 }
             } else {
                 try {
                     const error = JSON.parse(xhr.responseText)
                     console.error(`${fileObj.filename} error response:`, error)
-                    handleUploadError(fileObj, error.error || `Upload failed (${xhr.status})`)
+                    handleUploadError(fileObj, error.error || `Upload failed (${xhr.status})`, error.error_type)
                 } catch (e) {
                     console.error(`${fileObj.filename} error parse failed:`, e, 'Response:', xhr.responseText)
-                    handleUploadError(fileObj, `Upload failed (${xhr.status})`)
+                    handleUploadError(fileObj, `Upload failed (${xhr.status})`, `ERROR_${xhr.status}`)
                 }
             }
         })
@@ -350,12 +350,12 @@ function FileUploadTester() {
         // Handle errors
         xhr.addEventListener('error', () => {
             console.error(`${fileObj.filename} network error`)
-            handleUploadError(fileObj, 'Network error during upload')
+            handleUploadError(fileObj, 'Network error during upload', 'NETWORK_ERROR')
         })
 
         xhr.addEventListener('abort', () => {
             console.error(`${fileObj.filename} upload aborted`)
-            handleUploadError(fileObj, 'Upload was aborted')
+            handleUploadError(fileObj, 'Upload was aborted', 'UPLOAD_ABORTED')
         })
 
         // Start upload
@@ -387,7 +387,7 @@ function FileUploadTester() {
         }])
     }
 
-    const handleUploadError = (fileObj, error) => {
+    const handleUploadError = (fileObj, error, errorType) => {
         setUploadingFiles(prev => {
             const updated = {...prev}
             delete updated[fileObj.id]
@@ -396,12 +396,27 @@ function FileUploadTester() {
 
         setUploadQueue(prev => prev.filter(f => f.id !== fileObj.id))
 
-        setFailedFiles(prev => [...prev, {
-            ...fileObj,
-            status: 'failed',
-            error: error,
-            retryCount: fileObj.retryCount
-        }])
+        // Handle FILE_EXISTS specially - show as skipped instead of failed
+        if (errorType === 'FILE_EXISTS') {
+            setUploadedFiles(prev => [...prev, {
+                ...fileObj,
+                status: 'skipped',
+                uploadResult: {
+                    actual_filename: fileObj.filename,
+                    storage_path: 'N/A',
+                    web_view_link: null
+                },
+                error: error
+            }])
+        } else {
+            setFailedFiles(prev => [...prev, {
+                ...fileObj,
+                status: 'failed',
+                error: error,
+                errorType: errorType,
+                retryCount: fileObj.retryCount
+            }])
+        }
     }
 
     const retryUpload = (fileObj) => {
@@ -438,7 +453,8 @@ function FileUploadTester() {
 
     const validatingCount = selectedFiles.filter(f => f.status === 'validating').length
     const uploadingCount = Object.keys(uploadingFiles).length
-    const uploadedCount = uploadedFiles.length
+    const uploadedCount = uploadedFiles.filter(f => f.status === 'uploaded').length
+    const skippedCount = uploadedFiles.filter(f => f.status === 'skipped').length
     const failedCount = failedFiles.length
 
     const exampleFilenames = [
@@ -454,10 +470,21 @@ function FileUploadTester() {
     return (
         <div className="file-upload-tester">
             <div className="tester-header">
-                <h2>📤 File Upload Tester</h2>
-                <p className="subtitle">Test filename validation and upload files to Google Drive</p>
+                <h2>📤 File Upload</h2>
+                <p className="subtitle">Upload files to Google Drive with validation</p>
 
                 <div className="mode-toggle">
+                    <button
+                        className={`mode-btn ${uploadMode ? 'active' : ''}`}
+                        onClick={() => {
+                            setUploadMode(true)
+                            setFilename('')
+                            setResult(null)
+                            setBatchResults(null)
+                        }}
+                    >
+                        📤 Upload Mode
+                    </button>
                     <button
                         className={`mode-btn ${!uploadMode ? 'active' : ''}`}
                         onClick={() => {
@@ -469,17 +496,6 @@ function FileUploadTester() {
                         }}
                     >
                         🔍 Validate Mode
-                    </button>
-                    <button
-                        className={`mode-btn ${uploadMode ? 'active' : ''}`}
-                        onClick={() => {
-                            setUploadMode(true)
-                            setFilename('')
-                            setResult(null)
-                            setBatchResults(null)
-                        }}
-                    >
-                        📤 Upload Mode
                     </button>
                 </div>
             </div>
@@ -738,6 +754,15 @@ function FileUploadTester() {
                                                 </div>
                                             </div>
                                         )}
+                                        {skippedCount > 0 && (
+                                            <div className="stat-card skipped">
+                                                <span className="stat-icon">⏭️</span>
+                                                <div className="stat-info">
+                                                    <span className="stat-value">{skippedCount}</span>
+                                                    <span className="stat-label">Skipped</span>
+                                                </div>
+                                            </div>
+                                        )}
                                         {failedCount > 0 && (
                                             <div className="stat-card invalid">
                                                 <span className="stat-icon">❌</span>
@@ -787,11 +812,11 @@ function FileUploadTester() {
                                 )}
 
                                 {/* Uploaded Files */}
-                                {uploadedFiles.length > 0 && (
+                                {uploadedFiles.filter(f => f.status === 'uploaded').length > 0 && (
                                     <div className="upload-section success-section">
-                                        <h4>✅ Successfully Uploaded ({uploadedFiles.length})</h4>
+                                        <h4>✅ Successfully Uploaded ({uploadedFiles.filter(f => f.status === 'uploaded').length})</h4>
                                         <div className="file-list">
-                                            {uploadedFiles.map(file => (
+                                            {uploadedFiles.filter(f => f.status === 'uploaded').map(file => (
                                                 <div key={file.id} className="upload-file-item success">
                                                     <div className="file-info">
                                                         <span className="file-icon">✅</span>
@@ -809,6 +834,26 @@ function FileUploadTester() {
                                                                 Open in Drive →
                                                             </a>
                                                         )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Skipped Files (already exist) */}
+                                {uploadedFiles.filter(f => f.status === 'skipped').length > 0 && (
+                                    <div className="upload-section skipped-section">
+                                        <h4>⏭️ Already Exist ({uploadedFiles.filter(f => f.status === 'skipped').length})</h4>
+                                        <div className="file-list">
+                                            {uploadedFiles.filter(f => f.status === 'skipped').map(file => (
+                                                <div key={file.id} className="upload-file-item skipped">
+                                                    <div className="file-info">
+                                                        <span className="file-icon">⏭️</span>
+                                                        <span className="file-name">{file.filename}</span>
+                                                    </div>
+                                                    <div className="file-details-upload">
+                                                        <span className="path-info">{file.error}</span>
                                                     </div>
                                                 </div>
                                             ))}
