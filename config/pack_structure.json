@@ -1,0 +1,85 @@
+{
+    "elite": {
+        "keyVisual": [
+            "N5BE_SYN",
+            "A3E_HI"
+        ],
+        "techShots": [
+            "N5BE_SYN",
+            "A3E_HI"
+        ],
+        "supporting": [
+            "N5BE_SYN",
+            "A3E_HI"
+        ]
+    },
+    "vibrunt_rush": {
+        "keyVisual": [
+            "N5J",
+            "N5BJ",
+            "M2J",
+            "A3J",
+            "A3E_HI",
+            "N5BE",
+            "M2E",
+            "A3E",
+            "CN4E",
+            "CN4WE"
+        ],
+        "techShots": [
+            "N5J",
+            "N5BJ",
+            "M2J",
+            "A3J",
+            "A3E_HI",
+            "N5BE",
+            "M2E"
+        ],
+        "supporting": [
+            "N5BJ",
+            "M2J",
+            "A3J",
+            "A3E_HI"
+        ]
+    },
+    "heart_beat": {
+        "keyVisual": [
+            "N5J",
+            "N5BJ",
+            "A3J",
+            "A3E_HI",
+            "CN4E",
+            "CN4WE",
+            "N5BE",
+            "A3E"
+        ],
+        "techShots": [
+            "N5J",
+            "N5BJ",
+            "A3J",
+            "A3E_HI",
+            "CN4E",
+            "CN4WE"
+        ],
+        "supporting": [
+            "CN4E",
+            "CN4WE"
+        ]
+    },
+    "ltd": {
+        "keyVisual": [
+            "M2J_LTD"
+        ],
+        "techShots": [
+            "M2J_LTD"
+        ],
+        "supporting": [
+            "M2J_LTD"
+        ]
+    },
+    "sala": {
+        "keyVisual": [],
+        "techShots": [],
+        "supporting": []
+    }
+}

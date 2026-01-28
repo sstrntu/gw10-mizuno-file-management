@@ -8,8 +8,29 @@
     ],
     "rules": [
         {
+            "id": "color_pack",
+            "description": "Color Pack files (CP_EMEA, CP_Set1, CP_Set2, CP_Set3, CP_SALA)",
+            "match": {
+                "contains": [
+                    "_CP_"
+                ],
+                "extensions": [
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".webp"
+                ]
+            },
+            "pathTemplate": [
+                "{PACK_FOLDER}",
+                "{KEY_VISUAL}",
+                "Color Pack",
+                "{COLOR_PACK_OPTION}"
+            ]
+        },
+        {
             "id": "kv_color_pack",
-            "description": "Key Visual files containing _KV_Pack_",
+            "description": "Key Visual files containing _KV_Pack_ (deprecated)",
             "match": {
                 "contains": [
                     "_KV_Pack_"

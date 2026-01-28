@@ -76,9 +76,10 @@ class PackDetector:
 
         # Handle results
         if len(matched_packs) == 0:
+            valid_orders = ', '.join([f"{p.get('order'):02d}" for p in self.packs if p.get('order')])
             raise PackNotFoundError(
                 f"No pack found for filename: {filename}. "
-                f"Second segment must be pack order (01, 02, 03, or 04)."
+                f"Second segment must be a valid pack order ({valid_orders})."
             )
 
         if len(matched_packs) > 1:

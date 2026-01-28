@@ -1,18 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import './QCMatrix.css'
 import { API_ENDPOINTS } from '../config/api'
+
+// Cache storage (shared across component mounts)
+const qcDataCache = {
+    data: null,
+    timestamp: null,
+    CACHE_DURATION: 5 * 60 * 1000 // 5 minutes in milliseconds
+}
 
 function QCMatrix() {
     const { session, user } = useAuth()
     const [qcData, setQcData] = useState([])
     const [loading, setLoading] = useState(true)
+    const [refreshing, setRefreshing] = useState(false)
     const [error, setError] = useState(null)
     const [selectedFile, setSelectedFile] = useState(null)
     const [showReuploadModal, setShowReuploadModal] = useState(false)
     const [showActionsModal, setShowActionsModal] = useState(false)
     const [fileActions, setFileActions] = useState([])
     const [rejectComment, setRejectComment] = useState('')
+    const hasFetchedRef = useRef(false)
 
     // Filter State
     const [filters, setFilters] = useState({
@@ -22,9 +31,28 @@ function QCMatrix() {
         category: 'All'
     })
 
-    // Fetch QC data on mount
+    // Check if cached data is still fresh
+    const isCacheFresh = () => {
+        if (!qcDataCache.data || !qcDataCache.timestamp) return false
+        const now = Date.now()
+        return (now - qcDataCache.timestamp) < qcDataCache.CACHE_DURATION
+    }
+
+    // Fetch QC data on mount (with caching)
     useEffect(() => {
-        fetchQCData()
+        if (hasFetchedRef.current) return
+        hasFetchedRef.current = true
+
+        // Use cached data if fresh
+        if (isCacheFresh()) {
+            console.log('Using cached QC data')
+            setQcData(qcDataCache.data)
+            setLoading(false)
+            setError(null)
+        } else {
+            console.log('Cache stale or empty, fetching fresh data')
+            fetchQCData()
+        }
     }, [session])
 
     const fetchQCData = async () => {
@@ -36,59 +64,138 @@ function QCMatrix() {
 
         try {
             setLoading(true)
-            const response = await fetch(API_ENDPOINTS.QC_FILES, {
-                method: 'GET',
+
+            console.log('Fetching QC data using /api/drive/check-structure...')
+
+            // Use the same endpoint as Directory Structure (FAST!)
+            const response = await fetch(API_ENDPOINTS.DRIVE_CHECK_STRUCTURE, {
+                method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${session.access_token}`,
-                    'X-Google-Token': session.provider_token,
+                    'X-Google-Token': session.provider_token || '',
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({})  // Backend generates paths from config
             })
 
             const data = await response.json()
 
             if (data.success) {
-                // Transform Google Drive files into QC format
-                const qcItems = data.files.map((file, idx) => ({
-                    id: idx,
-                    filename: file.name,
-                    file_id: file.id,
-                    web_view_link: file.webViewLink,
-                    mime_type: file.mimeType,
-                    pack: 'Unknown',
-                    category: 'Unknown',
-                    model: 'Unknown',
-                    approvals: file.qc?.approval_count || 0,
-                    status: file.qc?.status || 'Pending',
-                    comments: '',
-                    created_at: file.createdTime
-                }))
-                setQcData(qcItems)
+                const { existing, missing, summary } = data
+
+                // Parse each existing path to extract metadata
+                const qcItems = existing.map((item, index) => {
+                    const pathParts = item.path.split('/')
+
+                    // Parse path: "1. ELITE/1. Key Visual/Model Name"
+                    const pack = pathParts[0] || 'Unknown'
+                    const category = pathParts[1] || 'Unknown'
+                    const model = pathParts[2] || 'Unknown'
+
+                    // Determine type from category
+                    let type = 'Unknown'
+                    if (category.includes('Key Visual')) type = 'KV'
+                    else if (category.includes('Tech Shot')) type = 'TS'
+                    else if (category.includes('T01')) type = 'T01'
+                    else if (category.includes('T02')) type = 'T02'
+                    else if (category.includes('T03')) type = 'T03'
+
+                    return {
+                        id: `${item.folder_id}-${index}`,
+                        path: item.path,
+                        folder_id: item.folder_id,
+                        pack: pack,
+                        category: category,
+                        model: model,
+                        type: type,
+                        file_count: 0,  // TODO: Get from database cache
+                        expected_files: 1,  // TODO: Calculate based on rules
+                        upload_status: 'Empty',  // Will be updated after counting files
+                        approvals: 0,
+                        qc_status: 'Pending',
+                        comments: ''
+                    }
+                })
+
+                // Add missing folders to the list
+                const missingItems = missing.map((item, index) => {
+                    const pathParts = item.path.split('/')
+                    const pack = pathParts[0] || 'Unknown'
+                    const category = pathParts[1] || 'Unknown'
+                    const model = pathParts[2] || 'Unknown'
+
+                    let type = 'Unknown'
+                    if (category.includes('Key Visual')) type = 'KV'
+                    else if (category.includes('Tech Shot')) type = 'TS'
+                    else if (category.includes('T01')) type = 'T01'
+                    else if (category.includes('T02')) type = 'T02'
+                    else if (category.includes('T03')) type = 'T03'
+
+                    return {
+                        id: `missing-${index}`,
+                        path: item.path,
+                        folder_id: null,
+                        pack: pack,
+                        category: category,
+                        model: model,
+                        type: type,
+                        file_count: 0,
+                        expected_files: 1,
+                        upload_status: 'Missing',
+                        approvals: 0,
+                        qc_status: 'Pending',
+                        comments: ''
+                    }
+                })
+
+                const allItems = [...qcItems, ...missingItems]
+
+                const newData = {
+                    stats: {
+                        total_expected: summary.total,
+                        uploaded: summary.existing_count,
+                        missing: summary.missing_count,
+                        upload_percentage: Math.round((summary.existing_count / summary.total) * 100)
+                    },
+                    files: allItems
+                }
+
+                // Update state
+                setQcData(newData)
                 setError(null)
+
+                // Save to cache
+                qcDataCache.data = newData
+                qcDataCache.timestamp = Date.now()
+                console.log('QC data cached for 5 minutes')
             } else {
                 setError(data.error || 'Failed to fetch QC data')
             }
         } catch (err) {
             setError(`Error fetching QC data: ${err.message}`)
-            console.error(err)
+            console.error('QC fetch error:', err)
         } finally {
             setLoading(false)
         }
     }
 
+    // Extract stats if available
+    const stats = qcData?.stats || { total_expected: 0, uploaded: 0, missing: 0, upload_percentage: 0 }
+    const files = qcData?.files || []
+
     // Extract unique values for filters
-    const packs = ['All', ...new Set(qcData.map(item => item.pack).filter(p => p !== 'Unknown'))]
-    const models = ['All', ...new Set(qcData.map(item => item.model).filter(m => m !== 'Unknown'))]
-    const categories = ['All', ...new Set(qcData.map(item => item.category).filter(c => c !== 'Unknown'))]
+    const packs = ['All', ...new Set(files.map(item => item.pack).filter(p => p !== 'Unknown'))]
+    const models = ['All', ...new Set(files.map(item => item.model).filter(m => m !== 'Unknown'))]
+    const categories = ['All', ...new Set(files.map(item => item.category).filter(c => c !== 'Unknown'))]
     const statuses = ['All', 'APPROVED', 'Pending', 'In Progress']
 
     // Filter Logic
-    const filteredData = qcData.filter(item => {
+    const filteredData = files.filter(item => {
         const statusMatch = filters.status === 'All'
             ? true
             : filters.status === 'In Progress'
-                ? item.status.includes('/')
-                : item.status === filters.status
+                ? item.qc_status.includes('/')
+                : item.qc_status === filters.status
         const packMatch = filters.pack === 'All' || item.pack === filters.pack
         const modelMatch = filters.model === 'All' || item.model === filters.model
         const categoryMatch = filters.category === 'All' || item.category === filters.category
@@ -96,12 +203,11 @@ function QCMatrix() {
     })
 
     // Dashboard Statistics
-    const totalFiles = filteredData.length
-    const approvedFiles = filteredData.filter(f => f.status === 'APPROVED').length
-    const completionRate = totalFiles > 0 ? Math.round((approvedFiles / totalFiles) * 100) : 0
+    const totalPaths = filteredData.length
+    const completePaths = filteredData.filter(f => f.upload_status === 'Complete').length
+    const approvedPaths = filteredData.filter(f => f.qc_status === 'APPROVED').length
+    const completionRate = totalPaths > 0 ? Math.round((approvedPaths / totalPaths) * 100) : 0
     const todoCount = filteredData.filter(item => item.comments !== '').length
-
-    const filesWithComments = filteredData.filter(item => item.comments !== '')
 
     const handleFilterChange = (key, value) => {
         setFilters(prev => ({ ...prev, [key]: value }))
@@ -114,6 +220,15 @@ function QCMatrix() {
             model: 'All',
             category: 'All'
         })
+    }
+
+    const handleRefresh = async () => {
+        setRefreshing(true)
+        // Clear cache to force fresh fetch
+        qcDataCache.data = null
+        qcDataCache.timestamp = null
+        await fetchQCData()
+        setRefreshing(false)
     }
 
     const handleApprove = async (fileItem) => {
@@ -310,6 +425,13 @@ function QCMatrix() {
                             {categories.map(c => <option key={c} value={c}>{c === 'All' ? 'Filter: Category' : c}</option>)}
                         </select>
                         <button onClick={resetFilters} className="btn-reset">Reset</button>
+                        <button
+                            onClick={handleRefresh}
+                            className="btn-refresh"
+                            disabled={refreshing}
+                        >
+                            {refreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -317,28 +439,24 @@ function QCMatrix() {
             {/* Mini Dashboard */}
             <div className="dashboard-grid">
                 <div className="dash-card total-card">
-                    <div className="card-lbl">Total Files</div>
-                    <div className="card-val">{totalFiles}</div>
-                    <div className="card-sub">Filtered View</div>
+                    <div className="card-lbl">Total Folders</div>
+                    <div className="card-val">{totalPaths}</div>
+                    <div className="card-sub">Model Folders</div>
                 </div>
-                <div className="dash-card completion-card">
-                    <div className="card-lbl">Completion</div>
-                    <div className="card-val progress-text">{completionRate}%</div>
-                    <div className="progress-bar-container">
-                        <div className="progress-bar-fill" style={{ width: `${completionRate}%` }}></div>
-                    </div>
+                <div className="dash-card success-card">
+                    <div className="card-lbl">Complete</div>
+                    <div className="card-val">{completePaths}</div>
+                    <div className="card-sub">{completePaths}/{totalPaths} Uploaded</div>
                 </div>
-                <div className="dash-card todo-card">
-                    <div className="card-lbl">Action Required</div>
-                    <div className="card-val">{todoCount}</div>
-                    <div className="card-sub">Files with Comments</div>
+                <div className="dash-card warning-card">
+                    <div className="card-lbl">Approved</div>
+                    <div className="card-val">{approvedPaths}</div>
+                    <div className="card-sub">{completionRate}% QC Complete</div>
                 </div>
-                <div className="dash-card status-card">
-                    <div className="card-lbl">Breakdown</div>
-                    <div className="mini-stats">
-                        <span className="mini-stat approved">{approvedFiles} <small>Appr</small></span>
-                        <span className="mini-stat pending">{totalFiles - approvedFiles} <small>Pend</small></span>
-                    </div>
+                <div className="dash-card info-card">
+                    <div className="card-lbl">Structure</div>
+                    <div className="card-val">{stats.uploaded}/{stats.total_expected}</div>
+                    <div className="card-sub">{stats.upload_percentage}% Built</div>
                 </div>
             </div>
 
@@ -346,62 +464,58 @@ function QCMatrix() {
                 {/* QC Matrix Table */}
                 <div className="matrix-section">
                     <div className="matrix-header-bar">
-                        <h3>📊 Data Matrix ({filteredData.length} files)</h3>
+                        <h3>📊 Quality Control Matrix ({filteredData.length} folders)</h3>
                     </div>
 
                     <div className="table-container">
                         <table className="qc-table">
                             <thead>
                                 <tr>
-                                    <th>File</th>
-                                    <th>Status</th>
-                                    <th>Approvals</th>
-                                    <th>Actions</th>
+                                    <th>Pack</th>
+                                    <th>Category</th>
+                                    <th>Model</th>
+                                    <th>Type</th>
+                                    <th>Path</th>
+                                    <th>Files</th>
+                                    <th>Upload Status</th>
+                                    <th>QC Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredData.map((item) => (
-                                    <tr key={item.file_id} className={getStatusClass(item.status)}>
-                                        <td>
-                                            <a href={item.web_view_link} target="_blank" rel="noopener noreferrer" className="file-link">
-                                                📄 {item.filename}
-                                            </a>
-                                        </td>
-                                        <td className="status-cell">
-                                            <span className="status-badge">{item.status}</span>
-                                        </td>
-                                        <td className="approval-cell">
-                                            <span className="approval-count">{item.approvals}/3</span>
-                                        </td>
-                                        <td className="action-cell">
-                                            <button
-                                                className="btn-approve"
-                                                onClick={() => handleApprove(item)}
-                                                disabled={item.approvals >= 3}
-                                                title="Approve this file"
-                                            >
-                                                ✓ Approve
-                                            </button>
-                                            <button
-                                                className="btn-reject"
-                                                onClick={() => {
-                                                    setSelectedFile(item)
-                                                    setShowReuploadModal(true)
-                                                }}
-                                                title="Reject and request changes"
-                                            >
-                                                ✗ Reject
-                                            </button>
-                                            <button
-                                                className="btn-history"
-                                                onClick={() => handleViewActions(item)}
-                                                title="View approval history"
-                                            >
-                                                📋 History
-                                            </button>
+                                {filteredData.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#888' }}>
+                                            No folders found. Create directory structure to see paths here.
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    filteredData.map((item) => (
+                                        <tr key={item.id}>
+                                            <td className="pack-cell">{item.pack}</td>
+                                            <td className="category-cell">{item.category}</td>
+                                            <td className="model-cell">{item.model}</td>
+                                            <td className="type-cell">{item.type}</td>
+                                            <td className="path-cell">
+                                                <span className="path-text">{item.path}</span>
+                                            </td>
+                                            <td className="file-count-cell">
+                                                <span className={item.file_count >= item.expected_files ? 'count-complete' : 'count-partial'}>
+                                                    {item.file_count}/{item.expected_files}
+                                                </span>
+                                            </td>
+                                            <td className="upload-status-cell">
+                                                <span className={`upload-badge upload-${item.upload_status.toLowerCase()}`}>
+                                                    {item.upload_status}
+                                                </span>
+                                            </td>
+                                            <td className="qc-status-cell">
+                                                <span className={`qc-badge qc-${item.qc_status.toLowerCase().replace(/\//g, '-')}`}>
+                                                    {item.qc_status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>

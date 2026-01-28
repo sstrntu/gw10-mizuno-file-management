@@ -1,0 +1,61 @@
+{
+    "elite": {
+        "options": [
+            {
+                "id": "option2",
+                "folder": "Option 2",
+                "filePatterns": ["CP_Set2"]
+            }
+        ]
+    },
+    "vibrunt_rush": {
+        "options": [
+            {
+                "id": "option1_emea",
+                "folder": "Option 1 (EMEA)",
+                "filePatterns": ["CP_EMEA", "CP_Set1"]
+            },
+            {
+                "id": "option2",
+                "folder": "Option 2",
+                "filePatterns": ["CP_Set2"]
+            },
+            {
+                "id": "option3",
+                "folder": "Option 3",
+                "filePatterns": ["CP_Set3"]
+            }
+        ]
+    },
+    "heart_beat": {
+        "options": [
+            {
+                "id": "option1_emea",
+                "folder": "Option 1 (EMEA)",
+                "filePatterns": ["CP_EMEA", "CP_Set1"]
+            },
+            {
+                "id": "option2",
+                "folder": "Option 2",
+                "filePatterns": ["CP_Set2"]
+            },
+            {
+                "id": "option3",
+                "folder": "Option 3",
+                "filePatterns": ["CP_Set3"]
+            }
+        ]
+    },
+    "ltd": {
+        "options": []
+    },
+    "sala": {
+        "options": [
+            {
+                "id": "option2",
+                "folder": "Option 2",
+                "filePatterns": ["CP_SALA"]
+            }
+        ]
+    }
+}

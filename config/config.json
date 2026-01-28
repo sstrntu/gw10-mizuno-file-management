@@ -1,5 +1,5 @@
 {
-    "version": "2.0",
+    "version": "2.1",
     "drive": {
         "rootFolder": "27SS_FTW_Sell-in"
     },
@@ -7,6 +7,8 @@
         "packs": "./packs.json",
         "models": "./models.json",
         "folders": "./folders.json",
-        "rules": "./rules.json"
+        "rules": "./rules.json",
+        "packStructure": "./pack_structure.json",
+        "colorPack": "./color_pack.json"
     }
 }

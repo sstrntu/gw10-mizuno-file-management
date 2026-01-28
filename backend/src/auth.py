@@ -106,12 +106,11 @@ def get_google_credentials_from_token(provider_token: str) -> Optional[Credentia
         return None
 
     try:
-        # Create credentials with the access token and scopes
-        # Scopes are needed for proper API access, especially for Shared Drives
-        credentials = Credentials(
-            token=provider_token,
-            scopes=['https://www.googleapis.com/auth/drive']
-        )
+        # Create credentials with just the access token
+        # Set expiry to None so it won't try to refresh
+        credentials = Credentials(token=provider_token)
+        # Override expiry to prevent refresh attempts
+        credentials.expiry = None
         return credentials
     except Exception as e:
         print(f"Error creating Google credentials: {e}")

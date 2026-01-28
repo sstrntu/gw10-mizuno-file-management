@@ -35,7 +35,7 @@ export const API_ENDPOINTS = {
   DRIVE_LIST_FILES: `${API_BASE_URL}/api/drive/list-files`,
 
   // Phase 3 - QC Management
-  QC_FILES: `${API_BASE_URL}/api/qc/files`,
+  // Note: QC Matrix uses DRIVE_CHECK_STRUCTURE for directory status
   QC_APPROVE: `${API_BASE_URL}/api/qc/approve`,
   QC_REJECT: `${API_BASE_URL}/api/qc/reject`,
   QC_ACTIONS: `${API_BASE_URL}/api/qc/actions`,

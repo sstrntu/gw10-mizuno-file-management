@@ -17,7 +17,7 @@ class DirectoryStructureGenerator:
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize the directory structure generator.
-        
+
         Args:
             config: Full configuration object
         """
@@ -25,6 +25,8 @@ class DirectoryStructureGenerator:
         self.packs = config.get("packs", [])
         self.models = config.get("models", [])
         self.folders = config.get("folders", {})
+        self.pack_structure = config.get("packStructure", {})
+        self.color_pack = config.get("colorPack", {})
         self.root_folder = config.get("drive", {}).get("rootFolder", "")
     
     def generate_structure(self) -> Dict[str, Any]:
@@ -49,24 +51,35 @@ class DirectoryStructureGenerator:
     
     def _generate_pack_structure(self, pack: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate directory structure for a single pack.
-        
+        Generate directory structure for a single pack using pack_structure.json.
+
         Args:
             pack: Pack configuration
-        
+
         Returns:
             Dict representing pack directory structure
         """
+        pack_id = pack.get("id", "")
         pack_folder = pack.get("folder", "")
         categories = self.folders.get("categories", {})
-        kv_subfolders = self.folders.get("kvSubfolders", {})
-        
+
         pack_node = {
             "name": pack_folder,
             "type": "directory",
             "children": []
         }
-        
+
+        # Get pack-specific structure
+        pack_models = self.pack_structure.get(pack_id, {})
+        pack_color_pack = self.color_pack.get(pack_id, {})
+
+        # Helper to get model folder name by code
+        def get_model_folder(model_code: str) -> str:
+            for model in self.models:
+                if model.get("code") == model_code:
+                    return model.get("folder", "")
+            return ""
+
         # 1. Key Visual
         if "keyVisual" in categories:
             kv_node = {
@@ -74,72 +87,80 @@ class DirectoryStructureGenerator:
                 "type": "directory",
                 "children": []
             }
-            
-            # Add KV subfolders
-            if "colorPack" in kv_subfolders:
-                kv_node["children"].append({
-                    "name": kv_subfolders["colorPack"],
-                    "type": "directory"
-                })
-            
-            if "psd" in kv_subfolders:
-                kv_node["children"].append({
-                    "name": kv_subfolders["psd"],
-                    "type": "directory"
-                })
-            
-            # Add model folders
-            for model in self.models:
-                kv_node["children"].append({
-                    "name": model.get("folder", ""),
-                    "type": "directory"
-                })
-            
+
+            # Add model folders (only models in this pack's keyVisual)
+            kv_models = pack_models.get("keyVisual", [])
+            for model_code in kv_models:
+                model_folder = get_model_folder(model_code)
+                if model_folder:
+                    model_node = {
+                        "name": model_folder,
+                        "type": "directory",
+                        "children": [
+                            {"name": "PSD", "type": "directory"}
+                        ]
+                    }
+                    kv_node["children"].append(model_node)
+
+            # Add Color Pack folder with options
+            if pack.get("hasColorPack", False):
+                color_pack_node = {
+                    "name": "Color Pack",
+                    "type": "directory",
+                    "children": []
+                }
+
+                # Add Color Pack options
+                for option in pack_color_pack.get("options", []):
+                    color_pack_node["children"].append({
+                        "name": option.get("folder", ""),
+                        "type": "directory"
+                    })
+
+                kv_node["children"].append(color_pack_node)
+
             pack_node["children"].append(kv_node)
-        
-        # 2. Tech Shots
-        if "techShots" in categories:
+
+        # 2. Tech Shots (skip for SALA)
+        if "techShots" in categories and not pack.get("colorPackOnly", False):
             tech_node = {
                 "name": categories["techShots"],
                 "type": "directory",
                 "children": []
             }
-            
-            # Add model folders
-            for model in self.models:
-                tech_node["children"].append({
-                    "name": model.get("folder", ""),
-                    "type": "directory"
-                })
-            
+
+            # Add model folders (only models in this pack's techShots)
+            tech_models = pack_models.get("techShots", [])
+            for model_code in tech_models:
+                model_folder = get_model_folder(model_code)
+                if model_folder:
+                    tech_node["children"].append({
+                        "name": model_folder,
+                        "type": "directory"
+                    })
+
             pack_node["children"].append(tech_node)
-        
-        # 3. Supporting Images
-        if "supporting" in categories:
+
+        # 3. Supporting Images (skip for SALA)
+        if "supporting" in categories and not pack.get("colorPackOnly", False):
             support_node = {
                 "name": categories["supporting"],
                 "type": "directory",
                 "children": []
             }
-            
-            # Add model folders
-            for model in self.models:
-                support_node["children"].append({
-                    "name": model.get("folder", ""),
-                    "type": "directory"
-                })
-            
+
+            # Add model folders (only models in this pack's supporting)
+            supporting_models = pack_models.get("supporting", [])
+            for model_code in supporting_models:
+                model_folder = get_model_folder(model_code)
+                if model_folder:
+                    support_node["children"].append({
+                        "name": model_folder,
+                        "type": "directory"
+                    })
+
             pack_node["children"].append(support_node)
-        
-        # 4. Carousel
-        if "carousel" in categories:
-            carousel_node = {
-                "name": categories["carousel"],
-                "type": "directory"
-            }
-            
-            pack_node["children"].append(carousel_node)
-        
+
         return pack_node
     
     def generate_flat_paths(self) -> List[str]:

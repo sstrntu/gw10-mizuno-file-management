@@ -105,7 +105,8 @@ class FilenameResolver:
                 path_template,
                 pack_info,
                 model_info,
-                self.config
+                self.config,
+                filename
             )
             
             return ResolverResult(

@@ -2,23 +2,39 @@
     "packs": [
         {
             "id": "elite",
+            "code": "01",
             "order": 1,
-            "folder": "1. ELITE"
+            "folder": "1. ELITE",
+            "hasColorPack": true
         },
         {
             "id": "vibrunt_rush",
+            "code": "02",
             "order": 2,
-            "folder": "2. VIBRUNT RUSH"
+            "folder": "2. VIBRUNT RUSH",
+            "hasColorPack": true
         },
         {
             "id": "heart_beat",
+            "code": "03",
             "order": 3,
-            "folder": "3. HEART BEAT"
+            "folder": "3. HEART BEAT",
+            "hasColorPack": true
         },
         {
             "id": "ltd",
+            "code": "04",
             "order": 4,
-            "folder": "4. LTD"
+            "folder": "4. LTD",
+            "hasColorPack": false
+        },
+        {
+            "id": "sala",
+            "code": "05",
+            "order": 5,
+            "folder": "5. SALA",
+            "hasColorPack": true,
+            "colorPackOnly": true
         }
     ]
 }

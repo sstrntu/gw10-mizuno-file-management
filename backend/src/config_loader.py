@@ -58,7 +58,9 @@ class ConfigLoader:
             "packs": [],
             "models": [],
             "folders": {},
-            "rules": {}
+            "rules": {},
+            "packStructure": {},
+            "colorPack": {}
         }
         
         # Load referenced config files
@@ -93,7 +95,19 @@ class ConfigLoader:
                     "allowedExtensions": rules_data.get("allowedExtensions", []),
                     "rules": rules_data.get("rules", [])
                 }
-        
+
+        # Load pack structure
+        if "packStructure" in includes:
+            pack_structure_path = self.config_dir / includes["packStructure"]
+            with open(pack_structure_path, 'r', encoding='utf-8') as f:
+                self.config["packStructure"] = json.load(f)
+
+        # Load color pack
+        if "colorPack" in includes:
+            color_pack_path = self.config_dir / includes["colorPack"]
+            with open(color_pack_path, 'r', encoding='utf-8') as f:
+                self.config["colorPack"] = json.load(f)
+
         return self.config
     
     def get_config(self) -> Dict[str, Any]:
