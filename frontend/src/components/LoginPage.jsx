@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { signInWithGoogle } from '../config/supabase';
 import './LoginPage.css';
 
-function LoginPage() {
+function LoginPage({ isReconnect = false, email = null }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -22,7 +22,11 @@ function LoginPage() {
         <div className="login-page">
             <div className="login-card">
                 <h1>Mizuno File Management</h1>
-                <p className="subtitle">Sign in to access the dashboard</p>
+                <p className="subtitle">
+                    {isReconnect
+                        ? `Google Drive connection required${email ? ` for ${email}` : ''}`
+                        : 'Sign in to access the dashboard'}
+                </p>
 
                 <button
                     className="btn-login-google"
@@ -30,7 +34,7 @@ function LoginPage() {
                     disabled={loading}
                 >
                     {loading ? (
-                        <span>Connecting...</span>
+                        <span>{isReconnect ? 'Reconnecting...' : 'Connecting...'}</span>
                     ) : (
                         <>
                             <svg className="google-icon" viewBox="0 0 24 24">
@@ -51,7 +55,7 @@ function LoginPage() {
                                     fill="#EA4335"
                                 />
                             </svg>
-                            <span>Sign in with Google</span>
+                            <span>{isReconnect ? 'Reconnect Google' : 'Sign in with Google'}</span>
                         </>
                     )}
                 </button>

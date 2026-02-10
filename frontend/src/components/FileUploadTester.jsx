@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '../hooks/useAuth'
 import './FileUploadTester.css'
 import { API_ENDPOINTS } from '../config/api'
+import { forceRelogin, isAuthErrorResponse } from '../utils/authUtils'
 
-function FileUploadTester() {
-    const { session } = useAuth()
+function FileUploadTester({ session }) {
 
     // Original validation mode state
     const [filename, setFilename] = useState('')
@@ -190,11 +189,13 @@ function FileUploadTester() {
         // Check authentication first
         if (!session) {
             alert('Please log in with Google before uploading files.')
+            await forceRelogin()
             return
         }
 
         if (!session.provider_token) {
             alert('Google authentication token not available. Please log in again.')
+            await forceRelogin()
             return
         }
 
@@ -302,6 +303,7 @@ function FileUploadTester() {
         if (!session || !session.access_token || !session.provider_token) {
             console.error('Session or tokens missing:', { session })
             handleUploadError(fileObj, 'Authentication tokens not available. Please refresh and log in again.')
+            void forceRelogin()
             return
         }
 
@@ -336,11 +338,25 @@ function FileUploadTester() {
                     handleUploadError(fileObj, 'Invalid response format', 'PARSE_ERROR')
                 }
             } else {
+                let error = null
+
                 try {
-                    const error = JSON.parse(xhr.responseText)
+                    error = JSON.parse(xhr.responseText)
+                    if (isAuthErrorResponse({ status: xhr.status }, error)) {
+                        handleUploadError(fileObj, 'Google session expired. Please log in again.', 'AUTH_REQUIRED')
+                        void forceRelogin()
+                        return
+                    }
+
                     console.error(`${fileObj.filename} error response:`, error)
                     handleUploadError(fileObj, error.error || `Upload failed (${xhr.status})`, error.error_type)
                 } catch (e) {
+                    if (isAuthErrorResponse({ status: xhr.status }, error)) {
+                        handleUploadError(fileObj, 'Google session expired. Please log in again.', 'AUTH_REQUIRED')
+                        void forceRelogin()
+                        return
+                    }
+
                     console.error(`${fileObj.filename} error parse failed:`, e, 'Response:', xhr.responseText)
                     handleUploadError(fileObj, `Upload failed (${xhr.status})`, `ERROR_${xhr.status}`)
                 }

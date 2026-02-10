@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './AuthStatus.css';
 
-function AuthStatus({ user, onLogout }) {
+function AuthStatus({ user, hasGoogleToken, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -19,8 +19,6 @@ function AuthStatus({ user, onLogout }) {
   if (!user) {
     return null; // Should not happen in this view given new routing, but safe guard
   }
-
-  const hasGoogleToken = !!user.app_metadata?.provider_token;
 
   return (
     <div className={`auth-status authenticated`}>

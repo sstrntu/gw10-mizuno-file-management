@@ -39,6 +39,7 @@ export function useAuth() {
     return {
         user,
         session,
+        isGoogleConnected: Boolean(session?.provider_token),
         loading,
         signInWithGoogle,
         signOut

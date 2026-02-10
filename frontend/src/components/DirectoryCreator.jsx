@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './DirectoryCreator.css'
 import { API_ENDPOINTS } from '../config/api'
+import { forceRelogin, isAuthErrorResponse } from '../utils/authUtils'
 
 function DirectoryCreator({ session, onScanStart, onScanEnd, onScanComplete, rootFolderId, setRootFolderId }) {
     const [loading, setLoading] = useState(false)
@@ -49,14 +50,12 @@ function DirectoryCreator({ session, onScanStart, onScanEnd, onScanComplete, roo
                 const response = await fetch(endpoint, options)
                 const data = await response.json()
 
-                if (response.status === 401) {
-                    setResult({
-                        success: false,
-                        error: 'Not authenticated. Please login with Google first.'
-                    })
-                } else {
-                    setResult(data)
+                if (isAuthErrorResponse(response, data)) {
+                    await forceRelogin()
+                    return
                 }
+
+                setResult(data)
             } else {
                 setResult({
                     success: false,
@@ -96,6 +95,12 @@ function DirectoryCreator({ session, onScanStart, onScanEnd, onScanComplete, roo
             })
 
             const data = await response.json()
+
+            if (isAuthErrorResponse(response, data)) {
+                await forceRelogin()
+                return
+            }
+
             setResult({
                 ...data,
                 isCheckResult: true
@@ -131,6 +136,12 @@ function DirectoryCreator({ session, onScanStart, onScanEnd, onScanComplete, roo
             })
 
             const data = await response.json()
+
+            if (isAuthErrorResponse(response, data)) {
+                await forceRelogin()
+                return
+            }
+
             setResult(data)
 
         } catch (error) {

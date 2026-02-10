@@ -40,8 +40,9 @@ class DriveService:
             Folder metadata dict or None if not found
         """
         try:
+            escaped_name = str(name or '').replace('\\', '\\\\').replace("'", "\\'")
             query_parts = [
-                f"name = '{name}'",
+                f"name = '{escaped_name}'",
                 f"mimeType = '{self.FOLDER_MIME_TYPE}'",
                 "trashed = false"
             ]

@@ -32,11 +32,18 @@ export const API_ENDPOINTS = {
   DRIVE_CREATE_DIRECTORIES: `${API_BASE_URL}/api/drive/create-directories`,
   DRIVE_RESET_STRUCTURE: `${API_BASE_URL}/api/drive/reset-structure`,
   DRIVE_UPLOAD: `${API_BASE_URL}/api/drive/upload`,
+  DRIVE_DELETE_FILE: `${API_BASE_URL}/api/drive/delete-file`,
   DRIVE_LIST_FILES: `${API_BASE_URL}/api/drive/list-files`,
+  DRIVE_FILE_COUNTS: `${API_BASE_URL}/api/drive/file-counts`,
+  DRIVE_FILES_BY_FOLDERS: `${API_BASE_URL}/api/drive/files-by-folders`,
 
   // Phase 3 - QC Management
   // Note: QC Matrix uses DRIVE_CHECK_STRUCTURE for directory status
   QC_APPROVE: `${API_BASE_URL}/api/qc/approve`,
   QC_REJECT: `${API_BASE_URL}/api/qc/reject`,
+  QC_COMMENT: `${API_BASE_URL}/api/qc/comment`,
+  QC_RECORDS: `${API_BASE_URL}/api/qc/records`,
+  QC_RECONCILE_LIVE_FILES: `${API_BASE_URL}/api/qc/reconcile-live-files`,
+  QC_TODO: `${API_BASE_URL}/api/qc/todo`,
   QC_ACTIONS: `${API_BASE_URL}/api/qc/actions`,
 };

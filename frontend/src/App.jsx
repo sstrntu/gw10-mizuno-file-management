@@ -9,7 +9,7 @@ import LoginPage from './components/LoginPage'
 import { useAuth } from './hooks/useAuth'
 
 function App() {
-  const { user, session, loading, signOut } = useAuth()
+  const { user, session, loading, signOut, isGoogleConnected } = useAuth()
   const [activeTab, setActiveTab] = useState('upload')
   const [showConfig, setShowConfig] = useState(false)
 
@@ -25,6 +25,11 @@ function App() {
   // Not authenticated -> Show Login Page
   if (!user) {
     return <LoginPage />
+  }
+
+  // Session exists but Google token missing/expired -> reconnect
+  if (!isGoogleConnected) {
+    return <LoginPage isReconnect email={user.email} />
   }
 
   // Authenticated -> Show Main App
@@ -43,7 +48,7 @@ function App() {
             <p className="subtitle">Directory Structure & File Upload Management System</p>
           </div>
           <div className="header-actions">
-            <AuthStatus user={user} onLogout={signOut} />
+            <AuthStatus user={user} hasGoogleToken={isGoogleConnected} onLogout={signOut} />
             <button
               className="btn-view-config"
               onClick={() => setShowConfig(true)}
@@ -71,7 +76,7 @@ function App() {
       <main className="app-main">
         {activeTab === 'structure' && <DirectoryViewer session={session} />}
         {activeTab === 'upload' && <FileUploadTester session={session} />}
-        {activeTab === 'qc' && <QCMatrix />}
+        {activeTab === 'qc' && <QCMatrix session={session} user={user} />}
       </main>
 
       {/* Config Modal */}
