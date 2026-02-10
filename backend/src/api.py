@@ -947,6 +947,11 @@ def drive_upload_file():
                 "error_type": "INVALID_FILE"
             }), 400
 
+        overwrite_requested = str(request.form.get('overwrite', 'false')).strip().lower() in (
+            '1', 'true', 'yes', 'on'
+        )
+        target_file_id = (request.form.get('target_file_id') or '').strip() or None
+
         # 2. Validate extension
         from src.config_loader import load_config
         config = load_config()
@@ -1029,21 +1034,44 @@ def drive_upload_file():
                 "error_type": "UPLOAD_FAILED"
             }), 500
 
-        # 6b. Check if file already exists
-        if drive.file_exists(filename, final_folder_id):
-            return jsonify({
-                "success": False,
-                "error": f"File '{filename}' already exists in this folder",
-                "error_type": "FILE_EXISTS"
-            }), 409
+        # 6b. Check if file already exists (or overwrite when requested)
+        existing_same_name = drive.find_files_by_name(filename, final_folder_id, max_results=20)
+        did_overwrite = False
+        overwritten_file_id = None
 
-        # 7. Upload file
-        upload_result = drive.upload_file(
-            file_content,
-            filename,
-            final_folder_id,
-            mime_type=file.content_type
-        )
+        if existing_same_name:
+            if overwrite_requested:
+                target_existing = None
+                if target_file_id:
+                    target_existing = next(
+                        (row for row in existing_same_name if row.get('id') == target_file_id),
+                        None
+                    )
+                if not target_existing:
+                    target_existing = existing_same_name[0]
+
+                overwritten_file_id = target_existing.get('id')
+                upload_result = drive.overwrite_file(
+                    overwritten_file_id,
+                    file_content,
+                    filename=filename,
+                    mime_type=file.content_type
+                )
+                did_overwrite = upload_result.get('success', False)
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": f"File '{filename}' already exists in this folder",
+                    "error_type": "FILE_EXISTS"
+                }), 409
+        else:
+            # 7. Upload file
+            upload_result = drive.upload_file(
+                file_content,
+                filename,
+                final_folder_id,
+                mime_type=file.content_type
+            )
 
         if not upload_result['success']:
             return jsonify({
@@ -1098,7 +1126,9 @@ def drive_upload_file():
             "file_id": upload_result.get('file_id'),
             "web_view_link": upload_result.get('web_view_link'),
             "created_time": upload_result.get('created_time'),
-            "storage_path": result.path_info.get('full_path', '')
+            "storage_path": result.path_info.get('full_path', ''),
+            "overwritten": did_overwrite,
+            "overwritten_file_id": overwritten_file_id
         })
 
     except Exception as e:

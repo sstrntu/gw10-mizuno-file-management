@@ -18,6 +18,10 @@ class DriveService:
 
     FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder'
 
+    @staticmethod
+    def _escape_query_literal(value: str) -> str:
+        return str(value or '').replace('\\', '\\\\').replace("'", "\\'")
+
     def __init__(self, credentials: Credentials):
         """
         Initialize Drive service with credentials.
@@ -521,7 +525,8 @@ class DriveService:
             True if file exists in folder, False otherwise
         """
         try:
-            query = f"name = '{filename}' and '{folder_id}' in parents and trashed = false"
+            escaped_filename = self._escape_query_literal(filename)
+            query = f"name = '{escaped_filename}' and '{folder_id}' in parents and trashed = false"
             results = self.service.files().list(
                 q=query,
                 spaces='drive',
@@ -537,6 +542,127 @@ class DriveService:
         except HttpError as e:
             print(f"Error checking if file exists: {e}")
             return False
+
+    def find_files_by_name(self, filename: str, folder_id: str, max_results: int = 20) -> List[Dict]:
+        """
+        Find files by exact name inside a folder, newest first.
+
+        Args:
+            filename: Exact filename to match
+            folder_id: Parent folder ID
+            max_results: Maximum files to return
+
+        Returns:
+            List of file metadata dicts
+        """
+        try:
+            escaped_filename = self._escape_query_literal(filename)
+            query = f"name = '{escaped_filename}' and '{folder_id}' in parents and trashed = false"
+            results = self.service.files().list(
+                q=query,
+                spaces='drive',
+                fields='files(id,name,webViewLink,createdTime,modifiedTime,mimeType,parents)',
+                pageSize=max_results,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                orderBy='modifiedTime desc'
+            ).execute()
+            return results.get('files', [])
+        except HttpError as e:
+            print(f"Error finding files by name '{filename}': {e}")
+            return []
+
+    def overwrite_file(
+        self,
+        file_id: str,
+        file_content: bytes,
+        filename: Optional[str] = None,
+        mime_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Overwrite content of an existing Drive file.
+
+        Args:
+            file_id: Existing Drive file ID
+            file_content: New file bytes
+            filename: Optional new name (kept same when omitted)
+            mime_type: MIME type
+
+        Returns:
+            Dict with success/error fields similar to upload_file()
+        """
+        import time
+
+        if not mime_type:
+            mime_type, _ = mimetypes.guess_type(filename or '')
+            if not mime_type:
+                mime_type = 'application/octet-stream'
+
+        max_retries = 3
+        retry_delay = 1
+
+        for attempt in range(max_retries):
+            try:
+                file_obj = BytesIO(file_content)
+                media = MediaIoBaseUpload(file_obj, mimetype=mime_type, resumable=True)
+
+                update_body = {'name': filename} if filename else None
+                file_result = self.service.files().update(
+                    fileId=file_id,
+                    body=update_body,
+                    media_body=media,
+                    fields='id,name,webViewLink,modifiedTime',
+                    supportsAllDrives=True
+                ).execute()
+
+                return {
+                    'success': True,
+                    'file_id': file_result.get('id'),
+                    'filename': file_result.get('name') or filename,
+                    'web_view_link': file_result.get('webViewLink'),
+                    'created_time': file_result.get('modifiedTime')
+                }
+            except HttpError as e:
+                if e.resp.status >= 500 and attempt < max_retries - 1:
+                    print(f"Transient error overwriting file (attempt {attempt + 1}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    if e.resp.status == 400:
+                        error_type = 'INVALID_FILE'
+                        error_msg = f"Invalid overwrite request: {str(e)}"
+                    elif e.resp.status == 403:
+                        error_type = 'PERMISSION_DENIED'
+                        error_msg = "Permission denied. Cannot overwrite this file."
+                    elif e.resp.status == 404:
+                        error_type = 'FILE_NOT_FOUND'
+                        error_msg = "Target file not found for overwrite."
+                    else:
+                        error_type = 'UPLOAD_FAILED'
+                        error_msg = f"Overwrite failed: {str(e)}"
+
+                    print(f"Error overwriting file: {error_msg}")
+                    return {
+                        'success': False,
+                        'filename': filename,
+                        'error': error_msg,
+                        'error_type': error_type
+                    }
+            except Exception as e:
+                print(f"Unexpected error overwriting file: {e}")
+                return {
+                    'success': False,
+                    'filename': filename,
+                    'error': f"Unexpected error: {str(e)}",
+                    'error_type': 'SERVER_ERROR'
+                }
+
+        return {
+            'success': False,
+            'filename': filename,
+            'error': 'Overwrite failed after maximum retries',
+            'error_type': 'MAX_RETRIES_EXCEEDED'
+        }
 
     def get_unique_filename(self, filename: str, folder_id: str) -> str:
         """

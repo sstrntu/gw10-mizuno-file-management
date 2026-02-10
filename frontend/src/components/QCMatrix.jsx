@@ -956,6 +956,13 @@ function QCMatrix({ session, user }) {
             })
             return
         }
+        if (reuploadFile.name !== selectedTodo.filename) {
+            setReuploadResult({
+                success: false,
+                message: `Selected file name must be "${selectedTodo.filename}".`
+            })
+            return
+        }
 
         try {
             setReuploading(true)
@@ -964,6 +971,10 @@ function QCMatrix({ session, user }) {
             const formData = new FormData()
             formData.append('file', reuploadFile)
             formData.append('filename', reuploadFilename.trim())
+            formData.append('overwrite', 'true')
+            if (selectedTodo.live_file_id || selectedTodo.file_id) {
+                formData.append('target_file_id', selectedTodo.live_file_id || selectedTodo.file_id)
+            }
 
             const response = await fetch(API_ENDPOINTS.DRIVE_UPLOAD, {
                 method: 'POST',
@@ -990,7 +1001,9 @@ function QCMatrix({ session, user }) {
 
             setReuploadResult({
                 success: true,
-                message: `Uploaded: ${data.actual_filename || reuploadFilename}`,
+                message: data.overwritten
+                    ? `Overwritten: ${data.actual_filename || reuploadFilename}`
+                    : `Uploaded: ${data.actual_filename || reuploadFilename}`,
                 link: data.web_view_link
             })
 
