@@ -175,7 +175,7 @@ function DirectoryCreator({ session, onScanStart, onScanEnd, onScanComplete, roo
                                     onChange={(e) => setRootFolderId(e.target.value)}
                                     placeholder="Enter Google Drive Folder ID"
                                 />
-                                <p className="field-hint">Defaults to: {DEFAULT_ROOT_ID}</p>
+                                <p className="field-hint">Shared across all tabs — changes here apply globally</p>
                             </div>
 
                             <div className="action-row">

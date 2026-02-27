@@ -11,7 +11,7 @@ const qcDataCache = {
     CACHE_DURATION: 5 * 60 * 1000 // 5 minutes in milliseconds
 }
 
-function QCMatrix({ session, user }) {
+function QCMatrix({ session, user, rootFolderId }) {
     const [qcData, setQcData] = useState([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState(false)
@@ -361,7 +361,7 @@ function QCMatrix({ session, user }) {
                     'X-Google-Token': session.provider_token || '',
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({})  // Backend generates paths from config
+                body: JSON.stringify(rootFolderId ? { root_folder_id: rootFolderId } : {})
             })
 
             const data = await response.json()

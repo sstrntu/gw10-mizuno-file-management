@@ -3,15 +3,11 @@ import './DirectoryViewer.css'
 import { API_ENDPOINTS } from '../config/api'
 import DirectoryCreator from './DirectoryCreator'
 
-// Default folder ID from requirements
-const DEFAULT_ROOT_ID = '1cKccx5IF91I6kZrqBdSx8MPNirXAf2c5'
-
-function DirectoryViewer({ session }) {
+function DirectoryViewer({ session, rootFolderId, setRootFolderId }) {
     const [driveStructure, setDriveStructure] = useState(null)
     const [configStructure, setConfigStructure] = useState(null)
     const [loading, setLoading] = useState(false)
     const [expandedNodes, setExpandedNodes] = useState(new Set())
-    const [rootFolderId, setRootFolderId] = useState(DEFAULT_ROOT_ID)
     const [hasScanned, setHasScanned] = useState(false)
     const [viewMode, setViewMode] = useState('drive') // 'drive' or 'config'
 

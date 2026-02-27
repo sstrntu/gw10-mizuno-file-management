@@ -3,7 +3,7 @@ import './FileUploadTester.css'
 import { API_ENDPOINTS } from '../config/api'
 import { forceRelogin, isAuthErrorResponse } from '../utils/authUtils'
 
-function FileUploadTester({ session }) {
+function FileUploadTester({ session, rootFolderId }) {
 
     // Original validation mode state
     const [filename, setFilename] = useState('')
@@ -310,6 +310,7 @@ function FileUploadTester({ session }) {
         const formData = new FormData()
         formData.append('file', fileObj.file)
         formData.append('filename', fileObj.filename)
+        if (rootFolderId) formData.append('root_folder_id', rootFolderId)
 
         // Set initial progress
         setUploadingFiles(prev => ({...prev, [fileObj.id]: 0}))

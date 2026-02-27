@@ -3,6 +3,7 @@ Flask API for Filename Resolver
 Provides REST API endpoint for filename resolution.
 """
 
+import io
 import os
 import unicodedata
 from flask import Flask, request, jsonify
@@ -24,7 +25,24 @@ from src.drive_service import DriveService
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200 MB
 CORS(app, supports_credentials=True)  # Enable CORS for React frontend with credentials
+
+# Pre-load SAM model at startup (only in sam mode) so first request is fast
+def _preload_sam():
+    import os
+    if os.environ.get("TECHSHOT_DIECUT_MODE", "sam").lower() != "sam":
+        print("[techshot] FAL mode — skipping SAM preload")
+        return
+    try:
+        from src.techshot import _get_sam_predictor
+        _get_sam_predictor()
+        print("[techshot] SAM model loaded and ready")
+    except Exception as e:
+        print(f"[techshot] SAM preload skipped: {e}")
+
+import threading
+threading.Thread(target=_preload_sam, daemon=True).start()
 
 
 @app.route('/api/resolve', methods=['POST'])
@@ -2244,6 +2262,117 @@ def qc_get_actions(file_id):
             "error": str(e),
             "error_type": "SERVER_ERROR"
         }), 500
+
+
+# ─── Tech Shot ───────────────────────────────────────────────────────────────
+
+@app.route('/api/techshot/segment', methods=['POST'])
+@require_auth
+def techshot_segment():
+    """
+    Segment the object at a clicked point using GrabCut.
+
+    Accepts multipart/form-data:
+        file      — capture photo
+        click_x   — click X in display pixels
+        click_y   — click Y in display pixels
+        img_width — displayed canvas width  (used to compute ratio)
+        img_height— displayed canvas height (used to compute ratio)
+
+    Returns PNG image with transparent background.
+    """
+    from src.techshot import segment_object
+    from flask import send_file
+
+    try:
+        if 'file' not in request.files:
+            return jsonify({"success": False, "error": "Missing 'file'", "error_type": "INVALID_REQUEST"}), 400
+
+        click_x = float(request.form.get('click_x', 0))
+        click_y = float(request.form.get('click_y', 0))
+        img_width = float(request.form.get('img_width', 1))
+        img_height = float(request.form.get('img_height', 1))
+
+        x_ratio = click_x / img_width
+        y_ratio = click_y / img_height
+
+        image_bytes = request.files['file'].read()
+        print(f"[techshot] segment request: click=({x_ratio:.2f},{y_ratio:.2f}) image_size={len(image_bytes)/1024:.0f}KB")
+        png_bytes = segment_object(image_bytes, x_ratio, y_ratio)
+        print(f"[techshot] segment done: result={len(png_bytes)/1024:.0f}KB")
+
+        return send_file(
+            io.BytesIO(png_bytes),
+            mimetype='image/png',
+            as_attachment=False,
+            download_name='segmented.png'
+        )
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "error_type": "SERVER_ERROR"}), 500
+
+
+@app.route('/api/techshot/naming-config', methods=['GET'])
+@require_auth
+def techshot_naming_config():
+    """Return packs, models, and pack→model mapping for Tech Shot filename generation."""
+    from src.config_loader import load_config
+    cfg = load_config()
+
+    root_folder = cfg.get('drive', {}).get('rootFolder', '')
+    season = root_folder.split('_')[0] if root_folder else ''
+
+    pack_structure = cfg.get('packStructure', {})
+    pack_models = {
+        pack_id: data.get('techShots', [])
+        for pack_id, data in pack_structure.items()
+    }
+
+    return jsonify({
+        'season': season,
+        'packs': cfg.get('packs', []),        # [{id, code, order, folder}, ...]
+        'models': cfg.get('models', []),       # [{code, folder}, ...]
+        'pack_models': pack_models,            # {pack_id: [model_code, ...]}
+    })
+
+
+@app.route('/api/techshot/composite', methods=['POST'])
+@require_auth
+def techshot_composite():
+    """
+    Composite the segmented object onto the background within the mask bounding box.
+
+    Accepts multipart/form-data:
+        bg        — background image file
+        mask      — mask image file (white shape on black)
+        segmented — segmented PNG with transparency
+
+    Returns final composite PNG.
+    """
+    from src.techshot import composite_images
+    from flask import send_file
+
+    try:
+        for field in ('bg', 'mask', 'segmented'):
+            if field not in request.files:
+                return jsonify({"success": False, "error": f"Missing '{field}'", "error_type": "INVALID_REQUEST"}), 400
+
+        bg_bytes = request.files['bg'].read()
+        mask_bytes = request.files['mask'].read()
+        segmented_bytes = request.files['segmented'].read()
+        draw_bbox = request.form.get('draw_bbox', '1') != '0'
+
+        png_bytes = composite_images(bg_bytes, mask_bytes, segmented_bytes, draw_bbox=draw_bbox)
+
+        return send_file(
+            io.BytesIO(png_bytes),
+            mimetype='image/png',
+            as_attachment=False,
+            download_name='composite.png'
+        )
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "error_type": "SERVER_ERROR"}), 500
 
 
 if __name__ == '__main__':

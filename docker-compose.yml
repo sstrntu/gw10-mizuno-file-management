@@ -4,17 +4,10 @@ services:
       context: .
       dockerfile: ./backend/Dockerfile
     container_name: mizuno-backend
-    ports:
-      - "5001:5001"
+    env_file: .env
     environment:
-      - FLASK_ENV=development
       - PYTHONUNBUFFERED=1
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
-      - DRIVE_ROOT_FOLDER_ID=${DRIVE_ROOT_FOLDER_ID}
-      - DRIVE_ROOT_FOLDER=${DRIVE_ROOT_FOLDER:-26SS_FTW_Sell-in}
-      - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-docker-secret-key}
+      - TECHSHOT_DIECUT_MODE=fal
     restart: unless-stopped
     networks:
       - mizuno-network
@@ -28,7 +21,9 @@ services:
         - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     container_name: mizuno-frontend
     ports:
-      - "3000:80"
+      - "3009:80"
+    environment:
+      - BACKEND_HOST=backend
     depends_on:
       - backend
     restart: unless-stopped
@@ -38,3 +33,4 @@ services:
 networks:
   mizuno-network:
     driver: bridge
+    name: mizuno-network

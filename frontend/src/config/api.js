@@ -46,4 +46,9 @@ export const API_ENDPOINTS = {
   QC_RECONCILE_LIVE_FILES: `${API_BASE_URL}/api/qc/reconcile-live-files`,
   QC_TODO: `${API_BASE_URL}/api/qc/todo`,
   QC_ACTIONS: `${API_BASE_URL}/api/qc/actions`,
+
+  // Tech Shot — image segmentation & compositing
+  TECHSHOT_SEGMENT: `${API_BASE_URL}/api/techshot/segment`,
+  TECHSHOT_COMPOSITE: `${API_BASE_URL}/api/techshot/composite`,
+  TECHSHOT_NAMING_CONFIG: `${API_BASE_URL}/api/techshot/naming-config`,
 };

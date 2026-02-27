@@ -17,6 +17,8 @@ services:
       - DRIVE_ROOT_FOLDER_ID=${DRIVE_ROOT_FOLDER_ID}
       - DRIVE_ROOT_FOLDER=${DRIVE_ROOT_FOLDER:-26SS_FTW_Sell-in}
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY:-docker-secret-key}
+      - TECHSHOT_DIECUT_MODE=fal
+      - FAL_KEY=${FAL_KEY}
     restart: always
     networks:
       - shared_network
@@ -36,6 +38,8 @@ services:
         - VITE_SUPABASE_URL=${SUPABASE_URL}
         - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     container_name: mizuno-frontend-prod
+    environment:
+      - BACKEND_HOST=backend
     depends_on:
       - backend
     restart: always
