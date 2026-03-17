@@ -407,6 +407,56 @@ body {
   padding-bottom: 4px;
 }
 
+/* Mask selector */
+.ts-mask-select {
+  margin-bottom: 8px;
+}
+
+.ts-mask-select-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ts-mask-btn {
+  flex: 1;
+  padding: 6px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ts-mask-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0, 255, 255, 0.06);
+}
+
+.ts-mask-btn--active {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0, 255, 255, 0.12);
+}
+
+.ts-mask-preview {
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.ts-mask-preview img {
+  width: 100%;
+  display: block;
+  opacity: 0.8;
+}
+
 /* File Naming */
 .ts-naming-section {
   border: 1px solid var(--border-color);

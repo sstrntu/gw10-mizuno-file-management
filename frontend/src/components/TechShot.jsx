@@ -281,6 +281,20 @@ export default function TechShot({ session }) {
     }
   }
 
+  async function handleMaskSelect(shotNum) {
+    const name = `T${String(shotNum).padStart(2, '0')}`
+    const url = `/masks/${name}.jpg`
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Could not load ${name}`)
+      const blob = await res.blob()
+      const file = new File([blob], `${name}.jpg`, { type: blob.type })
+      handleMaskFile(file)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   async function handleCaptureFile(file) {
     setCaptureFile(file)
     setCapturePreviewing(false)
@@ -1088,7 +1102,30 @@ export default function TechShot({ session }) {
         <div className="ts-sidebar-section">
           <div className="ts-section-label">Persistent Setup</div>
           <UploadZone label="BG Image" previewUrl={bgUrl} onFile={handleBgFile} persistent />
-          <UploadZone label="Mask" previewUrl={maskUrl} onFile={handleMaskFile} persistent />
+
+          <div className="ts-mask-select">
+            <div className="ts-section-label" style={{ marginBottom: 6 }}>Mask</div>
+            <div className="ts-mask-select-row">
+              {[1, 2, 3, 4, 5].map(n => {
+                const name = `T${String(n).padStart(2, '0')}`
+                const active = maskFile?.name?.startsWith(name)
+                return (
+                  <button
+                    key={n}
+                    className={`ts-mask-btn ${active ? 'ts-mask-btn--active' : ''}`}
+                    onClick={() => handleMaskSelect(n)}
+                  >
+                    {name}
+                  </button>
+                )
+              })}
+            </div>
+            {maskUrl && (
+              <div className="ts-mask-preview">
+                <img src={maskUrl} alt="Mask preview" />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="ts-sidebar-section">
