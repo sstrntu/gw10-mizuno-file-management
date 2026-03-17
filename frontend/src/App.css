@@ -717,9 +717,90 @@ body {
   background: rgba(0, 255, 255, 0.03);
 }
 
+.ts-brush-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.ts-brush-mode {
+  display: inline-flex;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ts-brush-mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.ts-brush-mode-btn + .ts-brush-mode-btn {
+  border-left: 1px solid var(--border-color);
+}
+
+.ts-brush-mode-btn.active {
+  background: rgba(0, 255, 255, 0.16);
+  color: var(--accent-cyan);
+}
+
+.ts-brush-mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ts-brush-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.ts-brush-size input[type='range'] {
+  width: 160px;
+}
+
+.ts-brush-size strong {
+  color: var(--accent-cyan);
+  font-size: 0.66rem;
+  min-width: 40px;
+}
+
+.ts-brush-count {
+  font-size: 0.66rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+.ts-brush-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .ts-canvas-wrap {
   position: relative;
   line-height: 0;
+}
+
+.ts-canvas-wrap--brush {
+  display: inline-block;
+  align-self: center;
 }
 
 .ts-capture-img {
@@ -731,30 +812,36 @@ body {
   display: block;
 }
 
-.ts-capture-img--clickable {
+.ts-capture-img--brush {
   cursor: crosshair;
 }
 
-.ts-capture-img--clickable:hover {
+.ts-capture-img--brush:hover {
   border-color: var(--accent-cyan);
   box-shadow: 0 0 12px rgba(0, 255, 255, 0.15);
 }
 
-.ts-click-marker {
+.ts-brush-canvas {
   position: absolute;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-cyan);
-  background: rgba(0, 255, 255, 0.3);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  animation: ts-pulse 1s infinite;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+  border-radius: 4px;
 }
 
-@keyframes ts-pulse {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  50% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.6; }
+.ts-brush-canvas--paint {
+  cursor: crosshair;
+}
+
+.ts-brush-canvas--erase {
+  cursor: cell;
+}
+
+.ts-brush-canvas--disabled {
+  pointer-events: none;
+  cursor: progress;
 }
 
 .ts-canvas-overlay {
@@ -869,6 +956,134 @@ body {
   object-fit: contain;
   display: block;
 }
+
+/* Step 4 adjustment toolbar */
+.ts-adj-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+
+.ts-adj-tools {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ts-adj-tool-btn {
+  padding: 6px 14px;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.5px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.ts-adj-tool-btn:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.ts-adj-tool-btn.active {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0, 255, 255, 0.08);
+}
+
+.ts-adj-options {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.ts-adj-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ts-adj-label span {
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.ts-adj-label input[type="range"] {
+  width: 120px;
+  accent-color: var(--accent-cyan);
+}
+
+.ts-adj-label strong {
+  min-width: 36px;
+  text-align: right;
+  color: var(--text-primary);
+  font-size: 0.7rem;
+}
+
+.ts-adj-number {
+  width: 52px;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 0.65rem;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.ts-adj-number::-webkit-inner-spin-button,
+.ts-adj-number::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+.ts-adj-number:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.ts-adj-unit {
+  min-width: auto !important;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.ts-btn--sm {
+  padding: 4px 10px;
+  font-size: 0.6rem;
+}
+
+/* Step 4 canvas editor */
+.ts-canvas-editor {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.ts-composite-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
+  border-radius: 4px;
+}
+
 
 /* Buttons */
 .ts-btn {
