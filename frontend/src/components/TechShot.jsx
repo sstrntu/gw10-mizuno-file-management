@@ -94,11 +94,6 @@ export default function TechShot({ session }) {
       .catch(() => {})
   }, [session.access_token])
 
-  // Auto-reset model when pack changes
-  useEffect(() => {
-    setSelectedModel('')
-  }, [selectedPack])
-
   // Models available for the selected pack
   const availableModels = useMemo(() => {
     if (!namingConfig || !selectedPack) return []
@@ -108,12 +103,10 @@ export default function TechShot({ session }) {
       .filter(Boolean)
   }, [namingConfig, selectedPack])
 
-  // Auto-select first model when available models change
+  // When pack changes, always reset model to the first available one
   useEffect(() => {
-    if (availableModels.length && !selectedModel) {
-      setSelectedModel(availableModels[0].code)
-    }
-  }, [availableModels])
+    setSelectedModel(availableModels.length ? availableModels[0].code : '')
+  }, [selectedPack]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generated filename
   const generatedFilename = useMemo(() => {
@@ -147,9 +140,10 @@ export default function TechShot({ session }) {
   const [isBrushing, setIsBrushing] = useState(false)
 
   // Step 4 adjustment tools
-  const [adjustTool, setAdjustTool] = useState(null) // null | 'exposure' | 'saturation' | 'transform'
+  const [adjustTool, setAdjustTool] = useState(null) // null | 'exposure' | 'saturation' | 'contrast' | 'transform'
   const [exposureValue, setExposureValue] = useState(0)
   const [saturationValue, setSaturationValue] = useState(0)
+  const [contrastValue, setContrastValue] = useState(0)
   const [diecutScale, setDiecutScale] = useState(1.0)
   const [diecutRotation, setDiecutRotation] = useState(0)
 
@@ -718,7 +712,7 @@ export default function TechShot({ session }) {
       ctx.drawImage(bgImg, 0, 0, outW, outH)
 
       // Grab clean BG data for adjustment mask
-      const bgData = (exposureValue !== 0 || saturationValue !== 0)
+      const bgData = (exposureValue !== 0 || saturationValue !== 0 || contrastValue !== 0)
         ? ctx.getImageData(0, 0, outW, outH).data : null
 
       // Draw diecut fitted inside mask bbox with current transform (at output scale)
@@ -768,6 +762,13 @@ export default function TechShot({ session }) {
             r = Math.max(0, Math.min(255, gray + (r - gray) * sf))
             g = Math.max(0, Math.min(255, gray + (g - gray) * sf))
             b = Math.max(0, Math.min(255, gray + (b - gray) * sf))
+          }
+          if (contrastValue !== 0) {
+            const strength = alpha * (contrastValue / 100)
+            const cf = strength >= 0 ? 1 + strength : 1 / (1 - strength)
+            r = Math.max(0, Math.min(255, (r - 128) * cf + 128))
+            g = Math.max(0, Math.min(255, (g - 128) * cf + 128))
+            b = Math.max(0, Math.min(255, (b - 128) * cf + 128))
           }
           data[p] = r; data[p + 1] = g; data[p + 2] = b
         }
@@ -850,8 +851,8 @@ export default function TechShot({ session }) {
     drawBboxOverlay()
   }
 
-  // Apply exposure + saturation to the diecut region (diecutMaskRef) on the base composite
-  function renderAdjustedCanvas(expVal, satVal) {
+  // Apply exposure + saturation + contrast to the diecut region (diecutMaskRef) on the base composite
+  function renderAdjustedCanvas(expVal, satVal, conVal) {
     const canvas = compositeCanvasRef.current
     const base = baseImageDataRef.current
     const mask = diecutMaskRef.current
@@ -885,6 +886,14 @@ export default function TechShot({ session }) {
         b = Math.max(0, Math.min(255, gray + (b - gray) * sf))
       }
 
+      if (conVal !== 0) {
+        const strength = alpha * (conVal / 100)
+        const cf = strength >= 0 ? 1 + strength : 1 / (1 - strength)
+        r = Math.max(0, Math.min(255, (r - 128) * cf + 128))
+        g = Math.max(0, Math.min(255, (g - 128) * cf + 128))
+        b = Math.max(0, Math.min(255, (b - 128) * cf + 128))
+      }
+
       data[i] = r; data[i + 1] = g; data[i + 2] = b
     }
 
@@ -901,6 +910,7 @@ export default function TechShot({ session }) {
     setAdjustTool(null)
     setExposureValue(0)
     setSaturationValue(0)
+    setContrastValue(0)
     setDiecutScale(1.0)
     setDiecutRotation(0)
 
@@ -1385,6 +1395,13 @@ export default function TechShot({ session }) {
                   ◐ Saturation
                 </button>
                 <button
+                  className={`ts-adj-tool-btn ${adjustTool === 'contrast' ? 'active' : ''}`}
+                  onClick={() => setAdjustTool(prev => prev === 'contrast' ? null : 'contrast')}
+                  title="Adjust contrast of the diecut"
+                >
+                  ◑ Contrast
+                </button>
+                <button
                   className={`ts-adj-tool-btn ${adjustTool === 'transform' ? 'active' : ''}`}
                   onClick={() => setAdjustTool(prev => prev === 'transform' ? null : 'transform')}
                   title="Rotate and scale the diecut"
@@ -1392,6 +1409,30 @@ export default function TechShot({ session }) {
                   ⊞ Transform
                 </button>
               </div>
+
+              {adjustTool === 'contrast' && (
+                <div className="ts-adj-options">
+                  <label className="ts-adj-label">
+                    <span>Contrast</span>
+                    <input type="range" min="-100" max="100" value={contrastValue}
+                      onChange={e => {
+                        const v = +e.target.value
+                        setContrastValue(v)
+                        renderAdjustedCanvas(exposureValue, saturationValue, v)
+                      }} />
+                    <input type="number" className="ts-adj-number" min="-100" max="100"
+                      value={contrastValue}
+                      onChange={e => {
+                        const v = Math.max(-100, Math.min(100, +e.target.value || 0))
+                        setContrastValue(v)
+                        renderAdjustedCanvas(exposureValue, saturationValue, v)
+                      }} />
+                  </label>
+                  <button className="ts-btn ts-btn--secondary ts-btn--sm" onClick={() => { setContrastValue(0); renderAdjustedCanvas(exposureValue, saturationValue, 0) }}>
+                    Reset
+                  </button>
+                </div>
+              )}
 
               {adjustTool === 'exposure' && (
                 <div className="ts-adj-options">
@@ -1401,17 +1442,17 @@ export default function TechShot({ session }) {
                       onChange={e => {
                         const v = +e.target.value
                         setExposureValue(v)
-                        renderAdjustedCanvas(v, saturationValue)
+                        renderAdjustedCanvas(v, saturationValue, contrastValue)
                       }} />
                     <input type="number" className="ts-adj-number" min="-100" max="100"
                       value={exposureValue}
                       onChange={e => {
                         const v = Math.max(-100, Math.min(100, +e.target.value || 0))
                         setExposureValue(v)
-                        renderAdjustedCanvas(v, saturationValue)
+                        renderAdjustedCanvas(v, saturationValue, contrastValue)
                       }} />
                   </label>
-                  <button className="ts-btn ts-btn--secondary ts-btn--sm" onClick={() => { setExposureValue(0); renderAdjustedCanvas(0, saturationValue) }}>
+                  <button className="ts-btn ts-btn--secondary ts-btn--sm" onClick={() => { setExposureValue(0); renderAdjustedCanvas(0, saturationValue, contrastValue) }}>
                     Reset
                   </button>
                 </div>
@@ -1425,17 +1466,17 @@ export default function TechShot({ session }) {
                       onChange={e => {
                         const v = +e.target.value
                         setSaturationValue(v)
-                        renderAdjustedCanvas(exposureValue, v)
+                        renderAdjustedCanvas(exposureValue, v, contrastValue)
                       }} />
                     <input type="number" className="ts-adj-number" min="-100" max="100"
                       value={saturationValue}
                       onChange={e => {
                         const v = Math.max(-100, Math.min(100, +e.target.value || 0))
                         setSaturationValue(v)
-                        renderAdjustedCanvas(exposureValue, v)
+                        renderAdjustedCanvas(exposureValue, v, contrastValue)
                       }} />
                   </label>
-                  <button className="ts-btn ts-btn--secondary ts-btn--sm" onClick={() => { setSaturationValue(0); renderAdjustedCanvas(exposureValue, 0) }}>
+                  <button className="ts-btn ts-btn--secondary ts-btn--sm" onClick={() => { setSaturationValue(0); renderAdjustedCanvas(exposureValue, 0, contrastValue) }}>
                     Reset
                   </button>
                 </div>
@@ -1450,7 +1491,7 @@ export default function TechShot({ session }) {
                         const s = e.target.value / 100
                         setDiecutScale(s)
                         renderBaseCanvas(s, diecutRotation)
-                        renderAdjustedCanvas(exposureValue, saturationValue)
+                        renderAdjustedCanvas(exposureValue, saturationValue, contrastValue)
                       }} />
                     <input type="number" className="ts-adj-number" min="30" max="200"
                       value={Math.round(diecutScale * 100)}
@@ -1458,7 +1499,7 @@ export default function TechShot({ session }) {
                         const s = Math.max(30, Math.min(200, +e.target.value || 100)) / 100
                         setDiecutScale(s)
                         renderBaseCanvas(s, diecutRotation)
-                        renderAdjustedCanvas(exposureValue, saturationValue)
+                        renderAdjustedCanvas(exposureValue, saturationValue, contrastValue)
                       }} />
                     <span className="ts-adj-unit">%</span>
                   </label>
@@ -1469,7 +1510,7 @@ export default function TechShot({ session }) {
                         const r = +e.target.value
                         setDiecutRotation(r)
                         renderBaseCanvas(diecutScale, r)
-                        renderAdjustedCanvas(exposureValue, saturationValue)
+                        renderAdjustedCanvas(exposureValue, saturationValue, contrastValue)
                       }} />
                     <input type="number" className="ts-adj-number" min="-180" max="180"
                       value={diecutRotation}
@@ -1477,7 +1518,7 @@ export default function TechShot({ session }) {
                         const r = Math.max(-180, Math.min(180, +e.target.value || 0))
                         setDiecutRotation(r)
                         renderBaseCanvas(diecutScale, r)
-                        renderAdjustedCanvas(exposureValue, saturationValue)
+                        renderAdjustedCanvas(exposureValue, saturationValue, contrastValue)
                       }} />
                     <span className="ts-adj-unit">°</span>
                   </label>
@@ -1485,7 +1526,7 @@ export default function TechShot({ session }) {
                     setDiecutScale(1.0)
                     setDiecutRotation(0)
                     renderBaseCanvas(1.0, 0)
-                    renderAdjustedCanvas(exposureValue, saturationValue)
+                    renderAdjustedCanvas(exposureValue, saturationValue, contrastValue)
                   }}>
                     Reset
                   </button>
